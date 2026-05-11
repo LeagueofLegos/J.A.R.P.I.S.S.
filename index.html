@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily Quest Log</title>
+    <style>
+        :root {
+            --bg: #1a1a1a;
+            --text: #e0e0e0;
+            --accent: #4ade80;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            justify-content: center;
+            padding: 2rem;
+        }
+        .container {
+            width: 100%;
+            max-width: 400px;
+        }
+        h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; }
+        .task-item {
+            display: flex;
+            align-items: center;
+            background: #2a2a2a;
+            margin: 10px 0;
+            padding: 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .task-item:hover { background: #333; }
+        input[type="checkbox"] {
+            margin-right: 15px;
+            transform: scale(1.5);
+            accent-color: var(--accent);
+        }
+        .completed {
+            text-decoration: line-through;
+            opacity: 0.5;
+        }
+        .reset-note {
+            font-size: 0.8rem;
+            color: #888;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Daily Checklist</h1>
+    <div id="checklist"></div>
+    <p class="reset-note">Auto-resets daily at 3:00 AM</p>
+</div>
+
+<script>
+    const tasks = [
+        "Morning routine",
+        "Wrist Exercises 2x",
+        "ft10 w/ rachel",
+        "Apply to ONE job",
+        "Github Contribution",
+        "Did ONE Leetcode problem and review others",
+        "Lunch & Dinner",
+        "Night routine"
+    ];
+
+    const RESET_HOUR = 3; // 3 AM
+
+    function getStorageKey() {
+        const now = new Date();
+        let dateKey = now.toDateString();
+        
+        // If it's before 3AM, we are still technically on "yesterday's" list
+        if (now.getHours() < RESET_HOUR) {
+            const yesterday = new Date(now);
+            yesterday.setDate(now.getDate() - 1);
+            dateKey = yesterday.toDateString();
+        }
+        return `tasks_${dateKey}`;
+    }
+
+    function renderTasks() {
+        const container = document.getElementById('checklist');
+        const storageKey = getStorageKey();
+        const savedData = JSON.parse(localStorage.getItem(storageKey)) || {};
+
+        container.innerHTML = '';
+        tasks.forEach(task => {
+            const div = document.createElement('div');
+            div.className = 'task-item';
+            
+            const isChecked = savedData[task] || false;
+            
+            div.innerHTML = `
+                <input type="checkbox" ${isChecked ? 'checked' : ''}>
+                <span class="${isChecked ? 'completed' : ''}">${task}</span>
+            `;
+
+            div.onclick = () => {
+                const cb = div.querySelector('input');
+                cb.checked = !cb.checked;
+                updateTask(task, cb.checked);
+                renderTasks();
+            };
+            container.appendChild(div);
+        });
+
+        // Cleanup old localStorage items to keep it tidy
+        for (let key in localStorage) {
+            if (key.startsWith('tasks_') && key !== storageKey) {
+                localStorage.removeItem(key);
+            }
+        }
+    }
+
+    function updateTask(task, isDone) {
+        const key = getStorageKey();
+        const data = JSON.parse(localStorage.getItem(key)) || {};
+        data[task] = isDone;
+        localStorage.setItem(key, JSON.stringify(data));
+    }
+
+    renderTasks();
+</script>
+</body>
+</html>
