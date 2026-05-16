@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quest Log Pro</title>
+    <title>Quest Log Pro - Dynamic</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
@@ -13,6 +13,7 @@
             --accent: #4ade80;
             --danger: #ff5f5f;
             --nav-bg: #2a2a2a;
+            --interactive: #2d2d2d;
         }
         body {
             font-family: 'Segoe UI', system-ui, sans-serif;
@@ -46,6 +47,7 @@
             cursor: pointer;
             border-radius: 5px;
             font-size: 0.9rem;
+            text-transform: capitalize;
         }
         nav button.active {
             background: var(--accent);
@@ -53,62 +55,99 @@
             border-color: var(--accent);
         }
 
-        .container { width: 90%; max-width: 500px; padding: 20px; }
-        .view { display: none; }
-        .view.active { display: block; }
-
-        h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; text-transform: capitalize; }
-
-        /* Input Area */
-        .input-group { display: flex; gap: 10px; margin-bottom: 20px; }
-        input[type="text"] {
-            flex: 1; padding: 12px; border-radius: 5px; border: 1px solid #444;
-            background: var(--card-bg); color: white;
+        .container { width: 90%; max-width: 550px; padding: 20px; }
+        h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; text-transform: capitalize; margin-top: 10px;}
+        
+        /* Modals & Collapse Tools */
+        .config-panel {
+            background: var(--card-bg);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid #333;
         }
-        .add-btn {
-            padding: 10px 20px; background: var(--accent); border: none;
-            border-radius: 5px; font-weight: bold; cursor: pointer;
-        }
+        .config-panel h3 { margin-top: 0; color: var(--accent); }
 
-        /* Task Items */
+        /* Input Controls */
+        .input-group { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
+        input[type="text"], input[type="number"], select {
+            flex: 1; padding: 10px; border-radius: 5px; border: 1px solid #444;
+            background: var(--bg); color: white; min-width: 80px;
+        }
+        .btn {
+            padding: 10px 15px; background: var(--accent); border: none;
+            border-radius: 5px; font-weight: bold; cursor: pointer; color: black;
+        }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-secondary { background: #555; color: white; }
+
+        /* Task Display */
         .task-item {
             display: flex; align-items: center; background: var(--card-bg);
-            margin: 10px 0; padding: 12px; border-radius: 8px;
+            margin: 8px 0; padding: 12px; border-radius: 8px; justify-content: space-between;
         }
         .task-content { display: flex; align-items: center; flex: 1; cursor: pointer; }
         input[type="checkbox"] { margin-right: 15px; transform: scale(1.3); accent-color: var(--accent); }
         .completed { text-decoration: line-through; opacity: 0.4; }
+        .date-badge { font-size: 0.75rem; color: #888; margin-left: auto; padding-right: 15px; }
         
         .delete-btn { color: var(--danger); background: none; border: none; font-size: 1.2rem; cursor: pointer; }
         
-        /* Stats Section */
-        #stats-container { margin-top: 30px; background: #252525; padding: 15px; border-radius: 10px; }
-        canvas { width: 100% !important; height: auto !important; }
+        /* Layout Modules */
+        #stats-container, .sync-container { margin-top: 30px; background: var(--card-bg); padding: 15px; border-radius: 10px; border: 1px solid #333; }
+        textarea { width: 100%; height: 60px; background: #121212; color: #4ade80; border: 1px solid #444; padding: 8px; border-radius: 5px; font-family: monospace; box-sizing: border-box; resize: none;}
+        .meta-text { font-size: 0.8rem; color: #888; margin-bottom: 10px; display: block;}
     </style>
 </head>
 <body>
 
-<nav id="main-nav">
-    <button onclick="switchTab('daily')" id="btn-daily">Daily</button>
-    <button onclick="switchTab('weekly')" id="btn-weekly">Weekly</button>
-    <button onclick="switchTab('biweekly')" id="btn-biweekly">Biweekly</button>
-    <button onclick="switchTab('monthly')" id="btn-monthly">Monthly</button>
-    <button onclick="switchTab('yearly')" id="btn-yearly">Yearly</button>
-</nav>
+<nav id="main-nav"></nav>
 
 <div class="container">
-    <h1 id="view-title">Daily Checklist</h1>
+    <!-- Category Manager -->
+    <div class="config-panel">
+        <h3>+ Create Custom Category</h3>
+        <div class="input-group">
+            <input type="text" id="new-cat-id" placeholder="e.g., biweekly, gym">
+            <select id="new-cat-type">
+                <option value="days">Resets Every X Days</option>
+                <option value="never">Never Resets (Infinite)</option>
+            </select>
+            <input type="number" id="new-cat-val" value="14" min="1" style="max-width: 60px;">
+            <button class="btn" onclick="createNewCategory()">Create</button>
+        </div>
+    </div>
+
+    <!-- Active Area -->
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h1 id="view-title">Checklist</h1>
+        <button class="btn btn-danger" id="del-cat-btn" style="padding:5px 10px; font-size:0.8rem;">Delete Category</button>
+    </div>
     
+    <span class="meta-text" id="reset-rules-text"></span>
+
     <div class="input-group">
-        <input type="text" id="task-input" placeholder="New objective...">
-        <button class="add-btn" onclick="addTask()">Add</button>
+        <input type="text" id="task-input" placeholder="Add new task...">
+        <button class="btn" onclick="addTask()">Add</button>
     </div>
 
     <div id="checklist"></div>
 
+    <!-- Data Insights -->
     <div id="stats-container">
-        <h3>Performance (Last 7 Days)</h3>
+        <h3>Yearly Metrics (Total Days Active)</h3>
         <canvas id="historyChart"></canvas>
+    </div>
+
+    <!-- Cross-Device Sync Engine -->
+    <div class="sync-container">
+        <h3>Device-to-Device Synchronization</h3>
+        <span class="meta-text">Copy your encrypted state to deploy across platforms seamlessly:</span>
+        <div class="input-group">
+            <button class="btn btn-secondary" onclick="exportState()">Generate Export String</button>
+            <button class="btn" onclick="importState()">Load Imported String</button>
+        </div>
+        <textarea id="sync-box" placeholder="Paste data bundle here..."></textarea>
     </div>
 </div>
 
@@ -116,44 +155,110 @@
     let currentTab = 'daily';
     let chart = null;
 
-    const config = {
-        daily: { reset: 3, label: 'Daily' },
-        weekly: { reset: 3, label: 'Weekly' },
-        biweekly: { reset: 3, label: 'Biweekly' },
-        monthly: { reset: 3, label: 'Monthly' },
-        yearly: { reset: 3, label: 'Yearly' }
+    // Factory Defaults
+    const defaultCategories = {
+        daily: { type: 'days', interval: 1, label: 'Daily' },
+        weekly: { type: 'days', interval: 7, label: 'Weekly' },
+        biweekly: { type: 'days', interval: 14, label: 'Biweekly' },
+        monthly: { type: 'days', interval: 30, label: 'Monthly' },
+        yearly: { type: 'days', interval: 365, label: 'Yearly' }
     };
 
-    // Initialize data
-    function getData(key, fallback = []) {
+    const defaultTasks = {
+        daily: ["Morning routine", "Wrist Exercises 2x", "ft10 w/ rachel", "Apply to ONE job", "Github Contribution", "Did ONE Leetcode problem and review others", "Lunch & Dinner", "Night routine"]
+    };
+
+    // State Hydration
+    let categories = getData('app_categories', defaultCategories);
+    let masterTasks = getData('app_master_tasks', defaultTasks);
+    let taskHistory = getData('app_task_history', {}); 
+
+    function getData(key, fallback) {
         const data = localStorage.getItem(key);
         return data ? JSON.parse(data) : fallback;
     }
 
+    function saveState() {
+        localStorage.setItem('app_categories', JSON.stringify(categories));
+        localStorage.setItem('app_master_tasks', JSON.stringify(masterTasks));
+        localStorage.setItem('app_task_history', JSON.stringify(taskHistory));
+    }
+
+    // Dynamic Navigation Renderer
+    function renderNav() {
+        const nav = document.getElementById('main-nav');
+        nav.innerHTML = '';
+        Object.keys(categories).forEach(cat => {
+            const btn = document.createElement('button');
+            btn.id = `btn-${cat}`;
+            btn.innerText = categories[cat].label || cat;
+            btn.onclick = () => switchTab(cat);
+            if (cat === currentTab) btn.className = 'active';
+            nav.appendChild(btn);
+        });
+    }
+
     function switchTab(tab) {
+        if (!categories[tab]) tab = Object.keys(categories)[0] || 'daily';
         currentTab = tab;
+        
         document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
-        document.getElementById(`btn-${tab}`).classList.add('active');
-        document.getElementById('view-title').innerText = `${tab} Checklist`;
+        const activeBtn = document.getElementById(`btn-${tab}`);
+        if(activeBtn) activeBtn.classList.add('active');
+        
+        document.getElementById('view-title').innerText = `${categories[tab].label || tab} Objectives`;
+        
+        const rulesText = categories[tab].type === 'never' ? 'Tracking Structure: Persistent (Never Resets)' : `Tracking Structure: Cyclical Interval (${categories[tab].interval} Days)`;
+        document.getElementById('reset-rules-text').innerText = rulesText;
+        
+        document.getElementById('del-cat-btn').onclick = () => deleteCategory(tab);
         render();
     }
 
-    function getProgressKey() {
-        const now = new Date();
-        const hour = now.getHours();
-        let d = new Date();
-        if (hour < config[currentTab].reset) d.setDate(d.getDate() - 1);
+    function createNewCategory() {
+        const idInput = document.getElementById('new-cat-id');
+        const rawId = idInput.value.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+        const type = document.getElementById('new-cat-type').value;
+        const interval = parseInt(document.getElementById('new-cat-val').value) || 1;
+
+        if(!rawId || categories[rawId]) return alert('Invalid or existing category handle.');
+
+        categories[rawId] = {
+            type: type,
+            interval: type === 'never' ? Infinity : interval,
+            label: idInput.value.trim()
+        };
+        masterTasks[rawId] = [];
         
-        const dateStr = d.toDateString();
-        
-        if (currentTab === 'daily') return `prog_daily_${dateStr}`;
-        if (currentTab === 'weekly') {
-            const week = Math.floor(d.getDate() / 7);
-            return `prog_weekly_${d.getMonth()}_${week}_${d.getFullYear()}`;
+        idInput.value = '';
+        saveState();
+        renderNav();
+        switchTab(rawId);
+    }
+
+    function deleteCategory(cat) {
+        if (Object.keys(categories).length <= 1) return alert("System requires a minimum of one structural layer.");
+        if (confirm(`Purge entire ${cat} stack? This actions clears all historical tracking associated with this node.`)) {
+            delete categories[cat];
+            delete masterTasks[cat];
+            saveState();
+            renderNav();
+            switchTab(Object.keys(categories)[0]);
         }
-        if (currentTab === 'monthly') return `prog_monthly_${d.getMonth()}_${d.getFullYear()}`;
-        if (currentTab === 'yearly') return `prog_yearly_${d.getFullYear()}`;
-        return `prog_${currentTab}_${dateStr}`;
+    }
+
+    // Interval Calculation Logic
+    function getResetCycleId() {
+        const catConfig = categories[currentTab];
+        if (!catConfig || catConfig.type === 'never') return 'static_epoch';
+
+        const now = new Date();
+        // Global anchor shift to 3:00 AM local time window
+        const adjustedTime = new Date(now.getTime() - (3 * 60 * 60 * 1000));
+        const totalDays = Math.floor(adjustedTime.getTime() / (1000 * 60 * 60 * 24));
+        
+        const cycleChunk = Math.floor(totalDays / catConfig.interval);
+        return `cycle_${cycleChunk}`;
     }
 
     function addTask() {
@@ -161,76 +266,90 @@
         const val = input.value.trim();
         if (!val) return;
 
-        const masterList = getData(`master_${currentTab}`);
-        masterList.push(val);
-        localStorage.setItem(`master_${currentTab}`, JSON.stringify(masterList));
+        if (!masterTasks[currentTab]) masterTasks[currentTab] = [];
+        masterTasks[currentTab].push(val);
+        
         input.value = '';
+        saveState();
         render();
     }
 
     window.toggleTask = function(taskName) {
-        const key = getProgressKey();
-        const progress = getData(key, {});
-        const history = getData('task_history', []);
+        const cycleId = getResetCycleId();
+        const todayStr = new Date().toDateString();
 
-        progress[taskName] = !progress[taskName];
-        
-        // Log to history if checked
-        if (progress[taskName]) {
-            history.push({ task: taskName, category: currentTab, time: Date.now() });
+        if (!taskHistory[currentTab]) taskHistory[currentTab] = {};
+        if (!taskHistory[currentTab][taskName]) taskHistory[currentTab][taskName] = { cycles: {}, timestamps: [] };
+
+        const taskNode = taskHistory[currentTab][taskName];
+        taskNode.cycles[cycleId] = !taskNode.cycles[cycleId];
+
+        if (taskNode.cycles[cycleId]) {
+            // Append current date metric if unique
+            if (!taskNode.timestamps.includes(todayStr)) {
+                taskNode.timestamps.push(todayStr);
+            }
         } else {
-            // Remove last instance if unchecked
-            const idx = history.findLastIndex(h => h.task === taskName && h.category === currentTab);
-            if (idx > -1) history.splice(idx, 1);
+            // Drop tracking if explicitly unverified
+            taskNode.timestamps = taskNode.timestamps.filter(t => t !== todayStr);
         }
 
-        localStorage.setItem(key, JSON.stringify(progress));
-        localStorage.setItem('task_history', JSON.stringify(history));
+        saveState();
         render();
     };
 
     window.deleteTask = function(index) {
-        const masterList = getData(`master_${currentTab}`);
-        masterList.splice(index, 1);
-        localStorage.setItem(`master_${currentTab}`, JSON.stringify(masterList));
+        const taskName = masterTasks[currentTab][index];
+        if(taskHistory[currentTab] && taskHistory[currentTab][taskName]) {
+            delete taskHistory[currentTab][taskName];
+        }
+        masterTasks[currentTab].splice(index, 1);
+        saveState();
         render();
     };
 
     function updateChart() {
-        const history = getData('task_history', []);
-        const last7Days = [...Array(7)].map((_, i) => {
-            const d = new Date();
-            d.setDate(d.getDate() - i);
-            return d.toDateString();
-        }).reverse();
+        const tasks = masterTasks[currentTab] || [];
+        const oneYearAgo = Date.now() - (365 * 24 * 60 * 60 * 1000);
 
-        const counts = last7Days.map(date => {
-            return history.filter(h => 
-                h.category === currentTab && 
-                new Date(h.time).toDateString() === date
-            ).length;
+        // Map items data arrays
+        const datasetValues = tasks.map(task => {
+            const node = taskHistory[currentTab]?.[task];
+            if (!node || !node.timestamps) return 0;
+            
+            // Filter timestamps within a 365-day boundary context
+            return node.timestamps.filter(ts => new Date(ts).getTime() >= oneYearAgo).length;
         });
 
         const ctx = document.getElementById('historyChart').getContext('2d');
         if (chart) chart.destroy();
-        
+
         chart = new Chart(ctx, {
-            type: 'line',
+            type: 'bar',
             data: {
-                labels: last7Days.map(d => d.split(' ').slice(0, 3).join(' ')),
+                labels: tasks,
                 datasets: [{
-                    label: 'Tasks Completed',
-                    data: counts,
-                    borderColor: '#4ade80',
-                    backgroundColor: 'rgba(74, 222, 128, 0.1)',
-                    fill: true,
-                    tension: 0.3
+                    data: datasetValues,
+                    backgroundColor: '#4ade80',
+                    borderRadius: 4,
+                    borderSkipped: false,
+                    barThickness: 16
                 }]
             },
             options: {
+                indexAxis: 'y', // Convert to horizontal grid model
+                responsive: true,
                 scales: {
-                    y: { beginAtZero: true, grid: { color: '#333' }, ticks: { color: '#888', stepSize: 1 } },
-                    x: { grid: { display: false }, ticks: { color: '#888' } }
+                    x: { 
+                        beginAtZero: true, 
+                        grid: { color: '#2a2a2a' }, 
+                        ticks: { color: '#888', stepSize: 1 },
+                        title: { display: true, text: 'Total Days Logged (Past Year)', color: '#666' }
+                    },
+                    y: { 
+                        grid: { display: false }, 
+                        ticks: { color: '#e0e0e0', font: { size: 11 } } 
+                    }
                 },
                 plugins: { legend: { display: false } }
             }
@@ -239,12 +358,19 @@
 
     function render() {
         const container = document.getElementById('checklist');
-        const tasks = getData(`master_${currentTab}`);
-        const progress = getData(getProgressKey(), {});
+        const tasks = masterTasks[currentTab] || [];
+        const cycleId = getResetCycleId();
 
         container.innerHTML = '';
         tasks.forEach((task, index) => {
-            const isChecked = progress[task] || false;
+            const taskData = taskHistory[currentTab]?.[task];
+            const isChecked = taskData?.cycles[cycleId] || false;
+            
+            // Extract final completed date stamp if applicable
+            const lastDate = (taskData?.timestamps && taskData.timestamps.length > 0) 
+                ? taskData.timestamps[taskData.timestamps.length - 1].split(' ').slice(1,3).join(' ')
+                : '';
+
             const div = document.createElement('div');
             div.className = 'task-item';
             div.innerHTML = `
@@ -252,6 +378,7 @@
                     <input type="checkbox" ${isChecked ? 'checked' : ''}>
                     <span class="${isChecked ? 'completed' : ''}">${task}</span>
                 </div>
+                ${lastDate ? `<span class="date-badge">Done: ${lastDate}</span>` : ''}
                 <button class="delete-btn" onclick="deleteTask(${index})">×</button>
             `;
             container.appendChild(div);
@@ -259,7 +386,36 @@
         updateChart();
     }
 
-    // Initialize
+    // Cross-Device JSON State Exchange Drivers
+    function exportState() {
+        const bundle = { categories, masterTasks, taskHistory };
+        document.getElementById('sync-box').value = btoa(encodeURIComponent(JSON.stringify(bundle)));
+        alert("Encrypted sync payload copied to interface text block.");
+    }
+
+    function importState() {
+        const raw = document.getElementById('sync-box').value.trim();
+        if (!raw) return alert("Target input payload container is empty.");
+        try {
+            const parsed = JSON.parse(decodeURIComponent(atob(raw)));
+            if (parsed.categories && parsed.masterTasks && parsed.taskHistory) {
+                categories = parsed.categories;
+                masterTasks = parsed.masterTasks;
+                taskHistory = parsed.taskHistory;
+                saveState();
+                renderNav();
+                switchTab(Object.keys(categories)[0]);
+                alert("State database successfully merged and reloaded.");
+            } else {
+                throw new Error("Corrupt payload framework structural integrity.");
+            }
+        } catch(e) {
+            alert("Parsing Exception: Verify data block validity.");
+        }
+    }
+
+    // Initial Engine Boot Execution
+    renderNav();
     switchTab('daily');
 </script>
 </body>
