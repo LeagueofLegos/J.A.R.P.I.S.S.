@@ -31,7 +31,7 @@
 
         /* Tactical Sidebar */
         .sidebar {
-            width: 320px;
+            width: 340px;
             background: #0c0c0f;
             border-right: 1px solid var(--border);
             display: flex;
@@ -46,15 +46,15 @@
             text-transform: uppercase;
             letter-spacing: 2px;
             color: var(--text-dim);
-            margin: 24px 0 12px 0;
+            margin: 20px 0 10px 0;
         }
 
         .config-box {
             background: var(--panel);
             border: 1px solid var(--border);
-            padding: 16px;
+            padding: 14px;
             border-radius: 8px;
-            margin-bottom: 20px;
+            margin-bottom: 10px;
         }
 
         input, select {
@@ -67,6 +67,7 @@
             margin-bottom: 10px;
             font-family: inherit;
             box-sizing: border-box;
+            font-size: 13px;
         }
 
         .btn {
@@ -81,32 +82,86 @@
             letter-spacing: 1px;
             cursor: pointer;
             transition: 0.2s;
+            font-size: 12px;
         }
 
         .btn:hover { background: #00cc6d; transform: translateY(-1px); }
+        .btn-danger { background: var(--danger); color: white; margin-top: 5px; }
+        .btn-danger:hover { background: #e03e4b; }
 
         .profile-list {
             flex: 1;
             overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        /* Hierarchy Directory Tree Elements */
+        .folder-block {
+            margin-bottom: 12px;
+            border-left: 1px dashed rgba(255, 255, 255, 0.1);
+            padding-left: 8px;
+        }
+
+        .folder-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-weight: 700;
+            font-size: 13px;
+            color: #f4b400;
+            margin-bottom: 6px;
         }
 
         .profile-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 12px;
+            padding: 10px 12px;
             background: var(--panel);
             border: 1px solid var(--border);
             border-radius: 6px;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
             cursor: pointer;
-            transition: 0.2s;
+            transition: 0.15s;
+            text-align: left;
+            width: 100%;
+            font-family: inherit;
+            color: inherit;
         }
 
         .profile-item:hover, .profile-item.active {
             border-color: var(--accent);
             background: var(--accent-dim);
         }
+
+        .item-text-group {
+            display: flex;
+            flex-direction: column;
+            pointer-events: none;
+        }
+
+        .item-label-meta {
+            color: var(--text-dim); 
+            font-size: 9px; 
+            text-transform: uppercase;
+            margin-top: 2px;
+        }
+
+        .scrub-action {
+            background: none;
+            border: none;
+            color: var(--text-dim);
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            padding: 0 4px;
+            transition: color 0.1s;
+        }
+        .scrub-action:hover { color: var(--danger); }
 
         /* Main Command Deck */
         .workspace {
@@ -200,18 +255,27 @@
 <div class="sidebar">
     <h1 style="font-family:'Orbitron'; font-size: 18px; color: var(--accent); margin: 0;">ENGINE.EXE</h1>
     
+    <h2>Mount Directory Folder</h2>
+    <div class="config-box">
+        <input type="text" id="folder-name" placeholder="Folder Name (e.g., Gaming Tech)">
+        <button class="btn" onclick="addFolderNode()">Create Folder</button>
+    </div>
+
     <h2>Mount New Profile</h2>
     <div class="config-box">
         <input type="text" id="prof-name" placeholder="Profile Name (e.g. Grinding)">
+        <select id="prof-folder-select">
+            <option value="unassigned">-- No Folder (Root) --</option>
+        </select>
         <select id="prof-type" onchange="toggleInterval()">
             <option value="cyclical">Daily/Cyclical Reset</option>
             <option value="never">Permanent Goal (No Reset)</option>
         </select>
         <input type="number" id="prof-int" value="1" placeholder="Days per cycle">
-        <button class="btn" onclick="addProfile()">Initialize</button>
+        <button class="btn" onclick="addProfile()">Initialize Profile</button>
     </div>
 
-    <h2>Active Profiles</h2>
+    <h2>Active Hierarchy</h2>
     <div id="sidebar-list" class="profile-list"></div>
 </div>
 
@@ -221,8 +285,7 @@
         <div id="active-meta" class="status-badge">System Offline</div>
     </div>
 
-    <div id="task-container">
-        </div>
+    <div id="task-container"></div>
 
     <div id="creator-tool" style="display:none; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border);">
         <div style="display:flex; gap: 10px;">
@@ -240,27 +303,27 @@
 </div>
 
 <script>
-    // Pure, distinct namespace storage retrieval to avoid key collisions
-    let rawState = localStorage.getItem('acc_engine_state_v2');
+    let rawState = localStorage.getItem('acc_engine_state_v3');
     let state;
 
+    // Namespace hydration mapping check setup
     try {
         let parsed = JSON.parse(rawState);
-        if (parsed && parsed.profiles && parsed.logs) {
+        if (parsed && parsed.profiles && parsed.logs && parsed.folders) {
             state = parsed;
         } else {
             throw new Error();
         }
     } catch(e) {
-        state = { profiles: {}, logs: {} };
-        localStorage.setItem('acc_engine_state_v2', JSON.stringify(state));
+        state = { folders: {}, profiles: {}, logs: {} };
+        localStorage.setItem('acc_engine_state_v3', JSON.stringify(state));
     }
 
     let activeProfileId = null;
     let chart = null;
 
     function save() {
-        localStorage.setItem('acc_engine_state_v2', JSON.stringify(state));
+        localStorage.setItem('acc_engine_state_v3', JSON.stringify(state));
     }
 
     function toggleInterval() {
@@ -268,20 +331,68 @@
         document.getElementById('prof-int').style.display = type === 'never' ? 'none' : 'block';
     }
 
+    function addFolderNode() {
+        const name = document.getElementById('folder-name').value.trim();
+        if (!name) return alert("Please enter a valid folder name.");
+        const id = 'f_' + Date.now();
+        state.folders[id] = { id, name };
+        save();
+        renderSidebar();
+        document.getElementById('folder-name').value = '';
+    }
+
+    function deleteFolderNode(id, event) {
+        event.stopPropagation();
+        if (!confirm("Delete this folder? Profiles inside will be unassigned to Root space layout.")) return;
+        
+        // Re-assign orphaned child components back to unassigned space layout safely
+        Object.keys(state.profiles).forEach(pId => {
+            if (state.profiles[pId].folderId === id) {
+                state.profiles[pId].folderId = 'unassigned';
+            }
+        });
+        
+        delete state.folders[id];
+        save();
+        renderSidebar();
+    }
+
     function addProfile() {
         const name = document.getElementById('prof-name').value.trim();
         if (!name) return alert("Please enter a valid profile name.");
         const id = 'p_' + Date.now();
+        
         state.profiles[id] = {
+            id,
             name,
+            folderId: document.getElementById('prof-folder-select').value,
             type: document.getElementById('prof-type').value,
             interval: parseInt(document.getElementById('prof-int').value) || 1,
             tasks: []
         };
+        
         save();
         renderSidebar();
         selectProfile(id);
         document.getElementById('prof-name').value = '';
+    }
+
+    function deleteProfileNode(id, event) {
+        event.stopPropagation();
+        if (!confirm(`Completely scrub profile details and historical tracking indexes?`)) return;
+        
+        delete state.profiles[id];
+        if (activeProfileId === id) {
+            activeProfileId = null;
+            document.getElementById('creator-tool').style.display = 'none';
+            document.getElementById('task-container').innerHTML = '';
+            document.getElementById('active-title').innerText = 'Awaiting Initialization';
+            document.getElementById('active-meta').innerText = 'System Offline';
+            if (chart) chart.destroy();
+        }
+        
+        save();
+        renderSidebar();
     }
 
     function addTask() {
@@ -312,26 +423,12 @@
         if (!state.logs[cycle]) state.logs[cycle] = {};
         if (!state.logs[cycle][activeProfileId]) state.logs[cycle][activeProfileId] = {};
         
-        // Default execution rules evaluate to true until explicitly toggled off
         const current = state.logs[cycle][activeProfileId][taskId] !== false; 
         state.logs[cycle][activeProfileId][taskId] = !current;
         
         save();
         renderTasks();
         updateChart();
-    }
-
-    function renderSidebar() {
-        const list = document.getElementById('sidebar-list');
-        list.innerHTML = '';
-        Object.keys(state.profiles).forEach(id => {
-            const p = state.profiles[id];
-            const div = document.createElement('div');
-            div.className = `profile-item ${id === activeProfileId ? 'active' : ''}`;
-            div.innerHTML = `<span>${p.name}</span> <span style="color:var(--text-dim); font-size:10px; text-transform:uppercase;">${p.type}</span>`;
-            div.onclick = () => selectProfile(id);
-            list.appendChild(div);
-        });
     }
 
     function selectProfile(id) {
@@ -342,8 +439,67 @@
         updateChart();
     }
 
+    function renderSidebar() {
+        const list = document.getElementById('sidebar-list');
+        const select = document.getElementById('prof-folder-select');
+        
+        list.innerHTML = '';
+        // Re-hydrate folder mounting dropdown field array tracking parameters
+        select.innerHTML = '<option value="unassigned">-- No Folder (Root) --</option>';
+        
+        // Render folder block groupings
+        Object.keys(state.folders).forEach(fId => {
+            const f = state.folders[fId];
+            
+            // Populate selector option maps
+            const opt = document.createElement('option');
+            opt.value = fId;
+            opt.textContent = f.name;
+            select.appendChild(opt);
+
+            // Generate structural container nodes
+            const block = document.createElement('div');
+            block.className = 'folder-block';
+            block.innerHTML = `
+                <div class="folder-header">
+                    <span>📁 ${f.name}</span>
+                    <button class="scrub-action" onclick="deleteFolderNode('${fId}', event)">✕</button>
+                </div>
+                <div id="container-${fId}"></div>
+            `;
+            list.appendChild(block);
+        });
+
+        // Track unassigned configurations targeted to Root framework layers
+        const rootContainer = document.createElement('div');
+        rootContainer.id = 'container-unassigned';
+        list.appendChild(rootContainer);
+
+        // Sort profiles inside their mapped layout structural designations
+        Object.keys(state.profiles).forEach(id => {
+            const p = state.profiles[id];
+            const targetContainerId = p.folderId && state.folders[p.folderId] ? p.folderId : 'unassigned';
+            const targetEl = document.getElementById(`container-${targetContainerId}`);
+            
+            if (targetEl) {
+                const btn = document.createElement('button');
+                btn.className = `profile-item ${id === activeProfileId ? 'active' : ''}`;
+                btn.onclick = () => selectProfile(id);
+                btn.innerHTML = `
+                    <div class="item-text-group">
+                        <span>📄 ${p.name}</span>
+                        <span class="item-label-meta">${p.type}</span>
+                    </div>
+                    <button class="scrub-action" onclick="deleteProfileNode('${id}', event)">✕</button>
+                `;
+                targetEl.appendChild(btn);
+            }
+        });
+    }
+
     function renderTasks() {
         const p = state.profiles[activeProfileId];
+        if (!p) return;
         const container = document.getElementById('task-container');
         document.getElementById('active-title').innerText = p.name;
         document.getElementById('active-meta').innerText = `Persistence Strategy: ${p.type.toUpperCase()}`;
@@ -355,7 +511,6 @@
             const isPassed = state.logs[cycle]?.[activeProfileId]?.[t.id] !== false;
             const card = document.createElement('div');
             card.className = `task-card ${isPassed ? '' : 'failed'}`;
-            // Fixed execution syntax error below by wrapping string token arguments securely inside quotes
             card.innerHTML = `
                 <div class="check-box ${isPassed ? 'checked' : ''}" onclick="toggleTask('${t.id}')"></div>
                 <div class="task-info">
@@ -432,7 +587,6 @@
         });
     }
 
-    // Run setup on startup
     renderSidebar();
     const keys = Object.keys(state.profiles);
     if (keys.length > 0) {
