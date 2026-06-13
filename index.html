@@ -238,7 +238,7 @@
             throw new Error();
         }
     } catch(e) {
-        state = { folders: {}, profiles: {}, logs: {}, interactions: {} }; // interactions[dateStr] = 'login' | 'marked'
+        state = { folders: {}, profiles: {}, logs: {}, interactions: {} };
         localStorage.setItem('acc_engine_state_v4', JSON.stringify(state));
     }
 
@@ -277,14 +277,14 @@
 
     function getDateString() {
         const now = new Date();
-        const adjusted = new Date(now.getTime() - (3 * 60 * 60 * 1000)); // 3 AM night-owl offset calibration
+        const adjusted = new Date(now.getTime() - (3 * 60 * 60 * 1000));
         return adjusted.toISOString().split('T')[0];
     }
 
     function logInteraction() {
         const dStr = getDateString();
         if (!state.interactions[dStr]) {
-            state.interactions[dStr] = 'login'; // Initial entry tracks ghost access behavior pattern defaults
+            state.interactions[dStr] = 'login';
             save();
         }
     }
@@ -318,7 +318,7 @@
             id, name,
             folderId: document.getElementById('prof-folder-select').value,
             type: document.getElementById('prof-type').value,
-            interval: parseInt(document.getElementById('prof-int').value) || 1,
+            interval: Math.max(1, parseInt(document.getElementById('prof-int').value) || 1),
             tasks: []
         };
         save();
@@ -377,7 +377,6 @@
         const current = state.logs[cycle][activeProfileId][taskId] !== false; 
         state.logs[cycle][activeProfileId][taskId] = !current;
         
-        // Elevate interaction parameters to acknowledge verified workflow behavior patterns
         state.interactions[getDateString()] = 'marked';
         
         save();
@@ -491,16 +490,21 @@
 
     function calculateStreak() {
         const p = state.profiles[activeProfileId];
-        if (!p || p.tasks.length === 0) return;
+        const counterEl = document.getElementById('streak-counter');
+        if (!p || p.tasks.length === 0) {
+            counterEl.innerText = "0 Cycles";
+            return;
+        }
         
         let streak = 0;
         let dayOffset = 0;
+        let maxIterations = 100; // Hard system breakout safety fence
         
-        while (true) {
+        while (dayOffset < maxIterations) {
             const now = new Date();
             const adj = new Date(now.getTime() - (dayOffset * 24 * 60 * 60 * 1000) - (3 * 60 * 60 * 1000));
             const daysSince = Math.floor(adj.getTime() / (1000 * 60 * 60 * 24));
-            const cId = p.type === 'never' ? 'epoch' : `cycle_${Math.floor(daysSince / p.interval)}`;
+            const cId = p.type === 'never' ? 'epoch' : `cycle_${Math.floor(daysSince / Math.max(1, p.interval))}`;
             
             let cyclePassed = true;
             p.tasks.forEach(t => {
@@ -509,13 +513,15 @@
 
             if (cyclePassed) {
                 streak++;
-                dayOffset += (p.type === 'never' ? 1 : p.interval);
-                if(p.type === 'never') break; // Epoch tracking stops looping past immediate check evaluations
+                if(p.type === 'never') {
+                    break;
+                }
+                dayOffset += Math.max(1, p.interval);
             } else {
                 break;
             }
         }
-        document.getElementById('streak-counter').innerText = `${streak} Cycles`;
+        counterEl.innerText = `${streak} Cycles`;
     }
 
     function updateChart() {
@@ -535,7 +541,7 @@
             const offset = i * (p.type === 'never' ? 0 : p.interval);
             const adj = new Date(now.getTime() - (offset * 24 * 60 * 60 * 1000) - (3 * 60 * 60 * 1000));
             const daysSince = Math.floor(adj.getTime() / (1000 * 60 * 60 * 24));
-            const cId = p.type === 'never' ? 'epoch' : `cycle_${Math.floor(daysSince / p.interval)}`;
+            const cId = p.type === 'never' ? 'epoch' : `cycle_${Math.floor(daysSince / Math.max(1, p.interval))}`;
             
             labels.push(p.type === 'never' ? 'Current State' : `Cycle -${i}`);
             
