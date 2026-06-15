@@ -293,9 +293,6 @@
 </div>
 
 <script>
-    // System Clock Reference Epoch Anchor setup for index increment generation rules
-    const ENGINE_GLOBAL_EPOCH_MS = 1781395200000; // Calibrated base timeline point (June 2026)
-
     let rawState = localStorage.getItem('acc_engine_state_v4');
     let state;
 
@@ -495,39 +492,14 @@
         renderSetupView();
     }
 
-    // Re-engineered sequential cycle calculations mapping back to index formats cleanly
-    function getCycleId(profileId) {
-        const p = state.profiles[profileId];
-        if (p.type === 'never') return 'epoch';
-        
-        const now = new Date();
-        const adjusted = new Date(now.getTime() - (3 * 60 * 60 * 1000));
-        const deltaMs = Math.max(0, adjusted.getTime() - ENGINE_GLOBAL_EPOCH_MS);
-        const deltaDays = Math.floor(deltaMs / (1000 * 60 * 60 * 24));
-        
-        return `cycle_${Math.floor(deltaDays / p.interval)}`;
-    }
-
-    function getHistoricalCycleId(profileId, dayOffset) {
-        const p = state.profiles[profileId];
-        if (p.type === 'never') return 'epoch';
-        
-        const now = new Date();
-        const adjusted = new Date(now.getTime() - (dayOffset * 24 * 60 * 60 * 1000) - (3 * 60 * 60 * 1000));
-        const deltaMs = Math.max(0, adjusted.getTime() - ENGINE_GLOBAL_EPOCH_MS);
-        const deltaDays = Math.floor(deltaMs / (1000 * 60 * 60 * 24));
-        
-        return `cycle_${Math.floor(deltaDays / p.interval)}`;
-    }
-
     function toggleTask(taskId) {
-        const cycle = getCycleId(activeProfileId);
-        if (!state.logs[cycle]) state.logs[cycle] = {};
-        if (!state.logs[cycle][activeProfileId]) state.logs[cycle][activeProfileId] = {};
+        const targetDateKey = getDateString();
+        if (!state.logs[targetDateKey]) state.logs[targetDateKey] = {};
+        if (!state.logs[targetDateKey][activeProfileId]) state.logs[targetDateKey][activeProfileId] = {};
         
-        const current = state.logs[cycle][activeProfileId][taskId] === true; 
-        state.logs[cycle][activeProfileId][taskId] = !current;
-        state.interactions[getDateString()] = 'marked';
+        const current = state.logs[targetDateKey][activeProfileId][taskId] === true; 
+        state.logs[targetDateKey][activeProfileId][taskId] = !current;
+        state.interactions[targetDateKey] = 'marked';
         
         save();
         renderInterrogateView();
@@ -642,10 +614,10 @@
         document.getElementById('active-title').innerText = `INTERROGATION // ${p.name}`;
         
         container.innerHTML = '';
-        const cycle = getCycleId(activeProfileId);
+        const targetDateKey = getDateString();
 
         p.tasks.forEach(t => {
-            const isCompleted = state.logs[cycle]?.[activeProfileId]?.[t.id] === true;
+            const isCompleted = state.logs[targetDateKey]?.[activeProfileId]?.[t.id] === true;
             const card = document.createElement('div');
             card.className = `task-card ${isCompleted ? 'verified' : 'failed'}`;
             
@@ -680,7 +652,7 @@
         const p = state.profiles[activeProfileId];
         const counterEl = document.getElementById('streak-counter');
         if (!p || p.tasks.length === 0) {
-            counterEl.innerText = "0 Cycles";
+            counterEl.innerText = "0 Days";
             return;
         }
         
@@ -689,14 +661,14 @@
         let maxIterations = 100;
         
         while (dayOffset < maxIterations) {
-            const cId = getHistoricalCycleId(activeProfileId, dayOffset);
+            const targetDateKey = getOffsetDateString(dayOffset);
             
-            let cyclePassed = p.tasks.length > 0;
+            let datePassed = p.tasks.length > 0;
             p.tasks.forEach(t => {
-                if (state.logs[cId]?.[activeProfileId]?.[t.id] !== true) cyclePassed = false;
+                if (state.logs[targetDateKey]?.[activeProfileId]?.[t.id] !== true) datePassed = false;
             });
 
-            if (cyclePassed) {
+            if (datePassed) {
                 streak++;
                 if(p.type === 'never') break;
                 dayOffset += Math.max(1, p.interval);
@@ -704,7 +676,7 @@
                 break;
             }
         }
-        counterEl.innerText = `${streak} Cycles`;
+        counterEl.innerText = `${streak} Days`;
     }
 
     function destroySingleNodeCharts() {
@@ -732,14 +704,13 @@
         
         for (let i = 6; i >= 0; i--) {
             const offset = i * (p.type === 'never' ? 0 : p.interval);
-            const cId = getHistoricalCycleId(activeProfileId, offset);
-            const rawDate = getOffsetDateString(offset);
+            const targetDateKey = getOffsetDateString(offset);
             
-            labels.push(p.type === 'never' ? 'Current Epoch' : `${rawDate} (${cId.replace('_', ' ')})`);
+            labels.push(p.type === 'never' ? 'Current Epoch' : targetDateKey);
             
             let passedCount = 0;
             p.tasks.forEach(t => {
-                if (state.logs[cId]?.[activeProfileId]?.[t.id] === true) passedCount++;
+                if (state.logs[targetDateKey]?.[activeProfileId]?.[t.id] === true) passedCount++;
             });
             absoluteCompletedCounts.push(passedCount);
         }
@@ -789,8 +760,8 @@
             const nodeSpecificHistoryData = [];
             for (let i = 6; i >= 0; i--) {
                 const offset = i * (p.type === 'never' ? 0 : p.interval);
-                const cId = getHistoricalCycleId(activeProfileId, offset);
-                const isNodePassed = state.logs[cId]?.[activeProfileId]?.[t.id] === true;
+                const targetDateKey = getOffsetDateString(offset);
+                const isNodePassed = state.logs[targetDateKey]?.[activeProfileId]?.[t.id] === true;
                 nodeSpecificHistoryData.push(isNodePassed ? 1 : 0);
             }
 
@@ -800,7 +771,7 @@
                 singleNodeChartInstances[t.id] = new Chart(subCtx, {
                     type: 'line',
                     data: {
-                        labels: labels.map(l => l.split(' ')[0]), 
+                        labels, 
                         datasets: [{
                             data: nodeSpecificHistoryData,
                             borderColor: '#3b82f6',
@@ -885,7 +856,6 @@
         anchorElementElement.remove();
     }
 
-    // High-performance deep reconciliation merging system architecture for multi-device sync
     function triggerNativeJsonImport(inputElement) {
         const file = inputElement.files[0];
         if (!file) return;
@@ -895,10 +865,9 @@
             try {
                 const incomingData = JSON.parse(event.target.result);
                 if (!incomingData || typeof incomingData !== 'object') {
-                    throw new Error("Invalid payload mapping asset structure.");
+                    throw new Error("Invalid payload structure.");
                 }
 
-                // 1. Reconcile Folder Nodes Array Mapping
                 if (incomingData.folders) {
                     Object.keys(incomingData.folders).forEach(fId => {
                         if (!state.folders[fId]) {
@@ -907,15 +876,12 @@
                     });
                 }
 
-                // 2. Reconcile Profile Entries Deep Objects Loop
                 if (incomingData.profiles) {
                     Object.keys(incomingData.profiles).forEach(pId => {
                         const incomingProfile = incomingData.profiles[pId];
                         if (!state.profiles[pId]) {
-                            // If profile doesn't exist locally, mount the complete tree block directly
                             state.profiles[pId] = incomingProfile;
                         } else {
-                            // Reconcile missing task fields within pre-existing profile signatures
                             const localTasksMap = new Set(state.profiles[pId].tasks.map(t => t.id));
                             incomingProfile.tasks.forEach(t => {
                                 if (!localTasksMap.has(t.id)) {
@@ -926,35 +892,30 @@
                     });
                 }
 
-                // 3. Merge History Tracking Matrix Cycles Loops
                 if (incomingData.logs) {
-                    Object.keys(incomingData.logs).forEach(cycleId => {
-                        if (!state.logs[cycleId]) state.logs[cycleId] = {};
+                    Object.keys(incomingData.logs).forEach(dateKey => {
+                        if (!state.logs[dateKey]) state.logs[dateKey] = {};
                         
-                        Object.keys(incomingData.logs[cycleId]).forEach(pId => {
-                            if (!state.logs[cycleId][pId]) state.logs[cycleId][pId] = {};
+                        Object.keys(incomingData.logs[dateKey]).forEach(pId => {
+                            if (!state.logs[dateKey][pId]) state.logs[dateKey][pId] = {};
                             
-                            Object.keys(incomingData.logs[cycleId][pId]).forEach(tId => {
-                                // Preserves any pre-existing validated true marks locally
-                                if (state.logs[cycleId][pId][tId] !== true) {
-                                    state.logs[cycleId][pId][tId] = incomingData.logs[cycleId][pId][tId];
+                            Object.keys(incomingData.logs[dateKey][pId]).forEach(tId => {
+                                if (state.logs[dateKey][pId][tId] !== true) {
+                                    state.logs[dateKey][pId][tId] = incomingData.logs[dateKey][pId][tId];
                                 }
                             });
                         });
                     });
                 }
 
-                // 4. Stitch Chronological Interaction Signatures Layout Map
                 if (incomingData.interactions) {
                     Object.keys(incomingData.interactions).forEach(dateStr => {
-                        // Priority ordering forces active check marks over simple launch logs
                         if (state.interactions[dateStr] !== 'marked') {
                             state.interactions[dateStr] = incomingData.interactions[dateStr];
                         }
                     });
                 }
 
-                // 5. Retain layout collapse flags mapping configs
                 if (incomingData.collapsedFolders) {
                     Object.keys(incomingData.collapsedFolders).forEach(fId => {
                         if (state.collapsedFolders[fId] === undefined) {
@@ -969,9 +930,9 @@
                 alert("Data integration loop successful. Foreign profiles and history entries cleanly merged.");
 
             } catch (err) {
-                alert("Import Exception: Failed to decode incoming backup asset format. Ensure file strings are clean.");
+                alert("Import Exception: Failed to decode incoming backup asset format.");
             }
-            inputElement.value = ''; // Reset node selector reference channel parameters
+            inputElement.value = ''; 
         };
         reader.readAsText(file);
     }
