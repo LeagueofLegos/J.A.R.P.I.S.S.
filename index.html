@@ -263,12 +263,13 @@
             <div class="analytics-box" style="display: flex; flex-direction: column; justify-content: space-between;">
                 <div>
                     <div class="stat-card">
+                        <div id="generation-label" style="font-size:11px; text-transform:uppercase; color:var(--warn); letter-spacing:1px; font-weight: bold; margin-bottom:5px;">GEN ARCHIVE RUN V0</div>
                         <div style="font-size:11px; text-transform:uppercase; color:var(--text-dim); letter-spacing:1px;">Active Alignment Streak</div>
                         <div class="stat-num" id="streak-counter">0 Days</div>
                     </div>
                 </div>
                 <div>
-                    <button class="btn" style="background: var(--warn); color: black;" onclick="exportDataBundle()">Assemble AI Analytics Payload</button>
+                    <button class="btn" style="background: var(--danger); color: white;" onclick="exportDataBundle()">Assemble AI Analytics Payload</button>
                     <button class="btn btn-secondary" style="margin-top:8px;" onclick="triggerNativeJsonDownload()">Export Data To JSON File</button>
                     <input type="file" id="import-json-file" style="display:none;" onchange="triggerNativeJsonImport(this)">
                     <button class="btn btn-secondary" style="margin-top:8px;" onclick="document.getElementById('import-json-file').click()">Import & Merge JSON File</button>
@@ -301,11 +302,13 @@
         if (parsed && parsed.profiles && parsed.logs && parsed.folders && parsed.interactions) {
             state = parsed;
             if (!state.collapsedFolders) state.collapsedFolders = {};
+            if (!state.archives) state.archives = [];
+            if (state.generationVersion === undefined) state.generationVersion = 1;
         } else {
             throw new Error();
         }
     } catch(e) {
-        state = { folders: {}, profiles: {}, logs: {}, interactions: {}, collapsedFolders: {} };
+        state = { folders: {}, profiles: {}, logs: {}, interactions: {}, collapsedFolders: {}, archives: [], generationVersion: 1 };
         localStorage.setItem('acc_engine_state_v4', JSON.stringify(state));
     }
 
@@ -330,6 +333,11 @@
         document.getElementById('prof-int').style.display = type === 'never' ? 'none' : 'block';
     }
 
+    function updateGenerationLabel() {
+        const lbl = document.getElementById('generation-label');
+        if(lbl) lbl.innerText = `GEN ARCHIVE RUN V${state.generationVersion || 1}`;
+    }
+
     function setMode(mode) {
         activeMode = mode;
         document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
@@ -341,6 +349,7 @@
         document.getElementById(`${mode}-section`).classList.remove('hidden');
 
         logInteraction();
+        updateGenerationLabel();
         if (activeProfileId) {
             renderSetupView();
             renderInterrogateView();
@@ -567,6 +576,10 @@
     }
 
     function renderSetupView() {
+        if (!activeProfileId || !state.profiles[activeProfileId]) {
+            document.getElementById('setup-task-container').innerHTML = '';
+            return;
+        }
         const p = state.profiles[activeProfileId];
         const container = document.getElementById('setup-task-container');
         document.getElementById('active-title').innerText = `SETUP // ${p.name}`;
@@ -609,6 +622,10 @@
     }
 
     function renderInterrogateView() {
+        if (!activeProfileId || !state.profiles[activeProfileId]) {
+            document.getElementById('interrogate-task-container').innerHTML = '';
+            return;
+        }
         const p = state.profiles[activeProfileId];
         const container = document.getElementById('interrogate-task-container');
         document.getElementById('active-title').innerText = `INTERROGATION // ${p.name}`;
@@ -649,6 +666,7 @@
     }
 
     function calculateStreak() {
+        if (!activeProfileId || !state.profiles[activeProfileId]) return;
         const p = state.profiles[activeProfileId];
         const counterEl = document.getElementById('streak-counter');
         if (!p || p.tasks.length === 0) {
@@ -693,6 +711,7 @@
         if (chart) chart.destroy();
         destroySingleNodeCharts();
 
+        if (!activeProfileId || !state.profiles[activeProfileId]) return;
         const p = state.profiles[activeProfileId];
         const nodeMatrixGrid = document.getElementById('node-charts-matrix');
         nodeMatrixGrid.innerHTML = '';
@@ -825,35 +844,40 @@
     }
 
     function exportDataBundle() {
-        if (!activeProfileId) return alert("Select a profile to analyze and reset.");
-        
-        const p = state.profiles[activeProfileId];
-        
-        // Roguelike Warning Check
         const confirmation = confirm(
-            `⚠️ ROGUELIKE EXECUTION PROTOCOL ACTIVATED ⚠️\n\n` +
-            `Assembling the analytics payload for profile [${p.name}] will automatically SCRUB all current task node baselines to force a foundational foundation restart.\n\n` +
-            `Your historical database log files will remain preserved in the micro-logs matrix.\n\n` +
-            `Do you confirm the reset of this build run?`
+            `⚠️ CONFIRM GENERATIONAL HARD RESET ⚠️\n\n` +
+            `This execution wipes ALL current directories, active folders, and user profiles back to complete ZERO.\n\n` +
+            `This current setup will be permanently archived as [Generation Version V${state.generationVersion}]. The compiled payload will contain this version AND all previous versions for chronological context analyzing.\n\n` +
+            `Wipe the interface state foundation clean?`
         );
         
         if (!confirmation) return;
 
+        // 1. Snapshot the complete setup snapshot data before blowing it up
+        const structuralRunSnapshot = {
+            generationIndex: `V${state.generationVersion}`,
+            timestamp: new Date().toISOString(),
+            folders: JSON.parse(JSON.stringify(state.folders)),
+            profiles: JSON.parse(JSON.stringify(state.profiles)),
+            logs: JSON.parse(JSON.stringify(state.logs)),
+            interactions: JSON.parse(JSON.stringify(state.interactions))
+        };
+
+        // 2. Commit snap snapshot record into permanent app archives state
+        state.archives.push(structuralRunSnapshot);
+
+        // 3. Compile full cross-generational analytical string payload array back out
         const payload = {
-            generationMetadata: { 
-                timestamp: new Date().toISOString(), 
-                platform: "Accountability Matrix V4 Roguelike Engine",
-                runStatus: "COMPLETED / RETIRED"
+            metadata: { 
+                compiledAt: new Date().toISOString(), 
+                latestRetiredVersion: `V${state.generationVersion}`,
+                totalGenerationsLogged: state.archives.length 
             },
-            profileStructureSnapshot: {
-                id: p.id,
-                name: p.name,
-                type: p.type,
-                interval: p.interval,
-                retiredTasks: [...p.tasks]
+            currentFreshEngineState: {
+                versionCounter: `V${state.generationVersion + 1}`,
+                status: "ZERO_POINT_INITIALIZATION"
             },
-            historicalDatabaseTimelineLogs: state.logs,
-            userInteractionSignatures: state.interactions
+            historicalGenerationsDatabaseTimeline: state.archives
         };
         
         const box = document.getElementById('export-box');
@@ -862,16 +886,34 @@
         
         try {
             navigator.clipboard.writeText(box.value);
-        } catch (err) {
-            // Fallback strategy if clip mechanics fail
-        }
+        } catch (err) {}
 
-        // Hard reset active profile's foundation build array
-        p.tasks = [];
+        // 4. Wipe active application properties straight down to pure zero
+        state.folders = {};
+        state.profiles = {};
+        state.logs = {};
+        state.interactions = {};
+        state.collapsedFolders = {};
+        
+        // Increment the run tracker counter
+        state.generationVersion += 1;
+        
+        // Commit wiped state structure safely back to browser disk storage
         save();
         
-        // Re-sync UI layers down the execution cascade
-        alert("Unified analysis log compiled, loaded into clipboard memory, and foundation layout cleanly wiped. Build your next run.");
+        // 5. Hard break active view indices and reset viewport parameters
+        activeProfileId = null;
+        if (chart) chart.destroy();
+        destroySingleNodeCharts();
+        
+        renderSidebar();
+        updateGenerationLabel();
+        
+        document.getElementById('creator-tool').style.display = 'none';
+        document.getElementById('active-title').innerText = 'Awaiting Initialization';
+        document.getElementById('active-meta').innerText = 'System Wiped Clean // Gen Initialized';
+        
+        alert(`Unified cross-generational timeline compiled into clipboard memory!\n\nEngine state completely returned to absolute zero. Generation V${state.generationVersion} terminal now online.`);
         setMode('setup');
     }
 
@@ -882,7 +924,9 @@
             profiles: state.profiles,
             logs: state.logs,
             interactions: state.interactions,
-            collapsedFolders: state.collapsedFolders
+            collapsedFolders: state.collapsedFolders,
+            archives: state.archives,
+            generationVersion: state.generationVersion
         };
         
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(dataOutputPayload, null, 2));
@@ -906,66 +950,20 @@
                     throw new Error("Invalid payload structure.");
                 }
 
-                if (incomingData.folders) {
-                    Object.keys(incomingData.folders).forEach(fId => {
-                        if (!state.folders[fId]) {
-                            state.folders[fId] = incomingData.folders[fId];
-                        }
-                    });
-                }
-
-                if (incomingData.profiles) {
-                    Object.keys(incomingData.profiles).forEach(pId => {
-                        const incomingProfile = incomingData.profiles[pId];
-                        if (!state.profiles[pId]) {
-                            state.profiles[pId] = incomingProfile;
-                        } else {
-                            const localTasksMap = new Set(state.profiles[pId].tasks.map(t => t.id));
-                            incomingProfile.tasks.forEach(t => {
-                                if (!localTasksMap.has(t.id)) {
-                                    state.profiles[pId].tasks.push(t);
-                                }
-                            });
-                        }
-                    });
-                }
-
-                if (incomingData.logs) {
-                    Object.keys(incomingData.logs).forEach(dateKey => {
-                        if (!state.logs[dateKey]) state.logs[dateKey] = {};
-                        
-                        Object.keys(incomingData.logs[dateKey]).forEach(pId => {
-                            if (!state.logs[dateKey][pId]) state.logs[dateKey][pId] = {};
-                            
-                            Object.keys(incomingData.logs[dateKey][pId]).forEach(tId => {
-                                if (state.logs[dateKey][pId][tId] !== true) {
-                                    state.logs[dateKey][pId][tId] = incomingData.logs[dateKey][pId][tId];
-                                }
-                            });
-                        });
-                    });
-                }
-
-                if (incomingData.interactions) {
-                    Object.keys(incomingData.interactions).forEach(dateStr => {
-                        if (state.interactions[dateStr] !== 'marked') {
-                            state.interactions[dateStr] = incomingData.interactions[dateStr];
-                        }
-                    });
-                }
-
-                if (incomingData.collapsedFolders) {
-                    Object.keys(incomingData.collapsedFolders).forEach(fId => {
-                        if (state.collapsedFolders[fId] === undefined) {
-                            state.collapsedFolders[fId] = incomingData.collapsedFolders[fId];
-                        }
-                    });
-                }
+                if (incomingData.folders) state.folders = incomingData.folders;
+                if (incomingData.profiles) state.profiles = incomingData.profiles;
+                if (incomingData.logs) state.logs = incomingData.logs;
+                if (incomingData.interactions) state.interactions = incomingData.interactions;
+                if (incomingData.collapsedFolders) state.collapsedFolders = incomingData.collapsedFolders;
+                if (incomingData.archives) state.archives = incomingData.archives;
+                if (incomingData.generationVersion !== undefined) state.generationVersion = incomingData.generationVersion;
 
                 save();
                 renderSidebar();
-                if (activeProfileId) selectProfile(activeProfileId);
-                alert("Data integration loop successful. Foreign profiles and history entries cleanly merged.");
+                updateGenerationLabel();
+                const keys = Object.keys(state.profiles);
+                if (keys.length > 0) selectProfile(keys[0]);
+                alert("Master cross-generational system timeline and active layouts completely restored.");
 
             } catch (err) {
                 alert("Import Exception: Failed to decode incoming backup asset format.");
@@ -976,6 +974,7 @@
     }
 
     renderSidebar();
+    updateGenerationLabel();
     const keys = Object.keys(state.profiles);
     if (keys.length > 0) selectProfile(keys[0]);
 </script>
