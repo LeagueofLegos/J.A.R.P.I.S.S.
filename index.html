@@ -123,14 +123,16 @@
         .profile-list::-webkit-scrollbar { width: 0px; }
 
         .folder-block { margin-bottom: 12px; border-left: 1px dashed rgba(255, 255, 255, 0.1); padding-left: 8px; }
-        .folder-header { display: flex; align-items: center; padding: 8px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border); border-radius: 4px; font-weight: 700; font-size: 13px; color: #f4b400; margin-bottom: 6px; gap: 6px; }
+        .folder-header { display: flex; align-items: center; padding: 8px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border); border-radius: 4px; font-weight: 700; font-size: 13px; color: #f4b400; margin-bottom: 6px; gap: 6px; outline: none; }
+        .folder-header.sidebar-nav-focused { border-color: #f4b400; background: rgba(244, 180, 0, 0.1); }
 
         .folder-toggle-btn { background: none; border: none; color: #f4b400; cursor: pointer; font-size: 11px; padding: 2px 6px; border-radius: 3px; }
         .folder-toggle-btn:hover { background: rgba(244, 180, 0, 0.1); }
         .folder-title-text { flex: 1; text-align: left; }
 
-        .profile-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; margin-bottom: 6px; cursor: pointer; transition: 0.15s; text-align: left; width: 100%; font-family: inherit; color: inherit; }
+        .profile-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; margin-bottom: 6px; cursor: pointer; transition: 0.15s; text-align: left; width: 100%; font-family: inherit; color: inherit; outline: none; }
         .profile-item:hover, .profile-item.active { border-color: var(--accent); background: var(--accent-dim); }
+        .profile-item.sidebar-nav-focused { border-color: var(--accent); box-shadow: 0 0 8px var(--accent-dim); background: rgba(255,255,255,0.02); }
         .item-text-group { display: flex; flex-direction: column; pointer-events: none; }
         .item-label-meta { color: var(--text-dim); font-size: 9px; text-transform: uppercase; margin-top: 2px; }
 
@@ -188,6 +190,10 @@
         .search-container { margin-bottom: 20px; position: relative; }
         .search-container input { padding-left: 36px; color: var(--accent); font-family: monospace; }
         .search-container::before { content: '/'; position: absolute; left: 14px; top: 10px; color: var(--text-dim); font-family: monospace; font-size: 14px; font-weight: bold; }
+
+        .sidebar-search-container { position: relative; margin-top: 10px; margin-bottom: 10px; }
+        .sidebar-search-container input { padding-left: 32px; background: #121217; color: #f4b400; font-family: monospace; font-size: 12px; }
+        .sidebar-search-container::before { content: '🔍'; position: absolute; left: 10px; top: 9px; font-size: 12px; }
     </style>
 </head>
 <body>
@@ -213,7 +219,11 @@
         <button class="btn" onclick="addProfile()">Initialize Profile</button>
     </div>
 
-    <h2>Active Hierarchy</h2>
+    <h2>Active Hierarchy Layout</h2>
+    <div class="sidebar-search-container">
+        <input type="text" id="hierarchy-search-bar" placeholder="Fuzzy finder... (Ctrl+P)" oninput="renderSidebar()">
+    </div>
+    
     <div class="hierarchy-wrapper">
         <button class="scroll-nav-btn" onclick="programmaticSidebarScroll(-1)">▲ Scroll Unit Up</button>
         <div id="sidebar-list" class="profile-list"></div>
@@ -235,9 +245,6 @@
     </div>
 
     <div id="home-section">
-        <div class="search-container">
-            <input type="text" id="home-search-bar" placeholder="Filter parameters by profile context... (Press '/' to isolate, 'j/k' to navigate list results)" oninput="renderHomeView()">
-        </div>
         <div id="home-task-container"></div>
     </div>
 
@@ -336,7 +343,11 @@
     let chart = null;
     let singleNodeChartInstances = {}; 
     let activeMode = 'home';
-    let vimFocusedIndex = -1; // Vim navigation tracking parameter
+    
+    // Independent Keyboard Navigation Scopes
+    let vimFocusedIndex = -1; 
+    let sidebarNavFocusedIndex = -1;
+    let sidebarNavElements = [];
 
     function save() {
         localStorage.setItem('acc_engine_state_v4', JSON.stringify(state));
@@ -422,7 +433,7 @@
     }
 
     function toggleFolderCollapse(id, event) {
-        event.stopPropagation();
+        if(event) event.stopPropagation();
         state.collapsedFolders[id] = !state.collapsedFolders[id];
         save();
         renderSidebar();
@@ -579,20 +590,37 @@
         document.getElementById('creator-tool').style.display = 'block';
         logInteraction();
         renderSidebar();
-        setMode(activeMode === 'home' ? 'setup' : activeMode);
+        setMode('setup');
     }
 
     function renderSidebar() {
         const list = document.getElementById('sidebar-list');
         const select = document.getElementById('prof-folder-select');
+        
+        const queryInput = document.getElementById('hierarchy-search-bar');
+        const queryText = queryInput ? queryInput.value.toLowerCase().trim() : '';
+
         list.innerHTML = '';
         select.innerHTML = '<option value="unassigned">-- No Folder (Root) --</option>';
         
+        sidebarNavElements = []; // Clear current layout element map references
+
         Object.keys(state.folders).forEach(fId => {
             const f = state.folders[fId];
             const opt = document.createElement('option');
             opt.value = fId; opt.textContent = f.name;
             select.appendChild(opt);
+
+            // Filter configuration logic
+            const matchFolder = f.name.toLowerCase().includes(queryText);
+            
+            // Collect child objects matching query parameter requirements
+            const matchedChildren = Object.keys(state.profiles).filter(pId => {
+                const p = state.profiles[pId];
+                return p.folderId === fId && p.name.toLowerCase().includes(queryText);
+            });
+
+            if (queryText && !matchFolder && matchedChildren.length === 0) return;
 
             const isCollapsed = state.collapsedFolders[fId] === true;
             const toggleIcon = isCollapsed ? '▶' : '▼';
@@ -600,37 +628,96 @@
             const block = document.createElement('div');
             block.className = 'folder-block';
             block.innerHTML = `
-                <div class="folder-header">
+                <div class="folder-header" tabindex="0" data-nav-type="folder" data-folder-id="${fId}">
                     <button class="folder-toggle-btn" onclick="toggleFolderCollapse('${fId}', event)">${toggleIcon}</button>
                     <span class="folder-title-text">📁 ${f.name}</span>
                     <button class="scrub-action" onclick="deleteFolderNode('${fId}', event)">✕</button>
                 </div>
-                <div id="container-${fId}" class="${isCollapsed ? 'hidden' : ''}"></div>
+                <div id="container-${fId}" class="${isCollapsed && !queryText ? 'hidden' : ''}"></div>
             `;
             list.appendChild(block);
+
+            const headerEl = block.querySelector('.folder-header');
+            sidebarNavElements.push({ el: headerEl, type: 'folder', id: fId });
+
+            const targetChildContainer = block.querySelector(`#container-${fId}`);
+            
+            Object.keys(state.profiles).forEach(pId => {
+                const p = state.profiles[pId];
+                if (p.folderId !== fId) return;
+                if (queryText && !p.name.toLowerCase().includes(queryText)) return;
+
+                const btn = document.createElement('button');
+                btn.className = `profile-item ${pId === activeProfileId ? 'active' : ''}`;
+                btn.setAttribute('tabindex', '0');
+                btn.setAttribute('data-nav-type', 'profile');
+                btn.setAttribute('data-profile-id', pId);
+                btn.onclick = () => selectProfile(pId);
+                btn.innerHTML = `
+                    <div class="item-text-group">
+                        <span>📄 ${p.name}</span>
+                        <span class="item-label-meta">${p.type}</span>
+                    </div>
+                    <button class="scrub-action" onclick="deleteProfileNode('${pId}', event)">✕</button>
+                `;
+                targetChildContainer.appendChild(btn);
+                sidebarNavElements.push({ el: btn, type: 'profile', id: pId });
+            });
         });
 
+        // Handle Root Context elements layout processing map
         const rootContainer = document.createElement('div');
         rootContainer.id = 'container-unassigned';
         list.appendChild(rootContainer);
 
         Object.keys(state.profiles).forEach(id => {
             const p = state.profiles[id];
-            const targetContainerId = p.folderId && state.folders[p.folderId] ? p.folderId : 'unassigned';
-            const targetEl = document.getElementById(`container-${targetContainerId}`);
-            
-            if (targetEl) {
-                const btn = document.createElement('button');
-                btn.className = `profile-item ${id === activeProfileId ? 'active' : ''}`;
-                btn.onclick = () => selectProfile(id);
-                btn.innerHTML = `
-                    <div class="item-text-group">
-                        <span>📄 ${p.name}</span>
-                        <span class="item-label-meta">${p.type}</span>
-                    </div>
-                    <button class="scrub-action" onclick="deleteProfileNode('${id}', event)">✕</button>
-                `;
-                targetEl.appendChild(btn);
+            if (p.folderId && state.folders[p.folderId]) return; // Handled
+            if (queryText && !p.name.toLowerCase().includes(queryText)) return;
+
+            const btn = document.createElement('button');
+            btn.className = `profile-item ${id === activeProfileId ? 'active' : ''}`;
+            btn.setAttribute('tabindex', '0');
+            btn.setAttribute('data-nav-type', 'profile');
+            btn.setAttribute('data-profile-id', id);
+            btn.onclick = () => selectProfile(id);
+            btn.innerHTML = `
+                <div class="item-text-group">
+                    <span>📄 ${p.name}</span>
+                    <span class="item-label-meta">${p.type}</span>
+                </div>
+                <button class="scrub-action" onclick="deleteProfileNode('${id}', event)">✕</button>
+            `;
+            rootContainer.appendChild(btn);
+            sidebarNavElements.push({ el: btn, type: 'profile', id: id });
+        });
+
+        // Ensure focused index safety bounds inside search constraints snapshots
+        if (sidebarNavFocusedIndex >= sidebarNavElements.length) {
+            sidebarNavFocusedIndex = sidebarNavElements.length - 1;
+        }
+        applySidebarVimFocusStyles();
+    }
+
+    function applySidebarVimFocusStyles() {
+        sidebarNavElements.forEach((item, idx) => {
+            if (idx === sidebarNavFocusedIndex) {
+                item.el.classList.add('sidebar-nav-focused');
+                item.el.focus();
+                
+                // Programmatic viewport alignment adjustment core routine logic
+                const parentContainer = document.getElementById('sidebar-list');
+                const elementTop = item.el.offsetTop;
+                const containerScrollTop = parentContainer.scrollTop;
+                const containerHeight = parentContainer.clientHeight;
+
+                if (elementTop < containerScrollTop) {
+                    parentContainer.scrollTop = elementTop - 10;
+                } else if (elementTop + item.el.clientHeight > containerScrollTop + containerHeight) {
+                    parentContainer.scrollTop = elementTop - containerHeight + item.el.clientHeight + 10;
+                }
+            } else {
+                item.el.classList.remove('sidebar-nav-focused');
             }
         });
     }
@@ -641,18 +728,11 @@
         const container = document.getElementById('home-task-container');
         
         const todayStr = getDateString();
-        const searchInput = document.getElementById('home-search-bar');
-        const filterText = searchInput ? searchInput.value.toLowerCase().trim() : '';
-        
         container.innerHTML = '';
         let homeDisplayArray = [];
 
         Object.keys(state.profiles).forEach(pId => {
             const p = state.profiles[pId];
-            
-            // Check if profile match filtering text parameter
-            if (filterText && !p.name.toLowerCase().includes(filterText)) return;
-
             p.tasks.forEach(t => {
                 let isCompletedToday = state.logs[todayStr]?.[pId]?.[t.id] === true;
                 if (isCompletedToday) return; 
@@ -682,7 +762,7 @@
         });
 
         if (homeDisplayArray.length === 0) {
-            container.innerHTML = `<div style="color:var(--text-dim); font-size:14px; font-style:italic;">No active structural execution parameters found matching filter limits.</div>`;
+            container.innerHTML = `<div style="color:var(--text-dim); font-size:14px; font-style:italic;">No active structural execution parameters found. Workspace Clear.</div>`;
             return;
         }
 
@@ -692,7 +772,6 @@
             return 0;
         });
 
-        // Boundary safety check for keyboard list mapping indexes
         if (vimFocusedIndex >= homeDisplayArray.length) {
             vimFocusedIndex = homeDisplayArray.length - 1;
         }
@@ -730,8 +809,9 @@
                 </div>
             `;
             
-            // Allow clicking to manually update tracking border indices smoothly
             card.addEventListener('click', () => {
+                sidebarNavFocusedIndex = -1; // Unfocus sidebar layout parameters
+                applySidebarVimFocusStyles();
                 vimFocusedIndex = idx;
                 renderHomeView();
             });
@@ -739,61 +819,97 @@
             container.appendChild(card);
         });
 
-        // Retain visual container scroll adjustment when moving selection outside viewpoint scope
-        if (vimFocusedIndex !== -1) {
+        if (vimFocusedIndex !== -1 && sidebarNavFocusedIndex === -1) {
             const cards = container.querySelectorAll('.task-card');
-            if (cards[vimFocusedIndex]) {
-                cards[vimFocusedIndex].focus();
-            }
+            if (cards[vimFocusedIndex]) cards[vimFocusedIndex].focus();
         }
     }
 
-    // Global Mouseless Event Listener Interface (Vim Keybindings Router)
+    // Main Keyboard Router Layout Logic Block
     window.addEventListener('keydown', function(e) {
         const activeEl = document.activeElement;
-        const searchInput = document.getElementById('home-search-bar');
+        const hSearchBar = document.getElementById('hierarchy-search-bar');
 
-        // Rule: If writing parameters inside form inputs, avoid hijacking structural characters
+        // Global Shortcut: Isolate hierarchy search field instantly on Ctrl+P intercept
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
+            e.preventDefault();
+            if (hSearchBar) {
+                hSearchBar.focus();
+                hSearchBar.select();
+            }
+            return;
+        }
+
+        // Drop active context emphasis boundaries safely inside standard controls fields
         if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT')) {
-            if (e.key === 'Escape' || (e.key === 'Enter' && activeEl === searchInput)) {
+            if (e.key === 'Escape' || (e.key === 'Enter' && activeEl === hSearchBar)) {
                 activeEl.blur();
                 e.preventDefault();
+                // Transfer navigational priority directly over to mapped hierarchy elements list snapshot layout
+                if (sidebarNavElements.length > 0) {
+                    sidebarNavFocusedIndex = 0;
+                    vimFocusedIndex = -1;
+                    applySidebarVimFocusStyles();
+                }
             }
             return;
         }
 
-        if (activeMode !== 'home') return;
-
-        // Route: Focus command trigger "/"
-        if (e.key === '/') {
-            if (searchInput) {
+        // Router branch choice 1: Mapped Sidebar Active Navigation Engine Hooks Intercept
+        if (sidebarNavFocusedIndex !== -1 && sidebarNavElements.length > 0) {
+            if (e.key === 'j') {
                 e.preventDefault();
-                searchInput.focus();
-                searchInput.select();
+                sidebarNavFocusedIndex = (sidebarNavFocusedIndex + 1) % sidebarNavElements.length;
+                applySidebarVimFocusStyles();
+            } else if (e.key === 'k') {
+                e.preventDefault();
+                sidebarNavFocusedIndex = sidebarNavFocusedIndex <= 0 ? sidebarNavElements.length - 1 : sidebarNavFocusedIndex - 1;
+                applySidebarVimFocusStyles();
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                sidebarNavFocusedIndex = -1;
+                applySidebarVimFocusStyles();
+                if (activeMode === 'home') { vimFocusedIndex = 0; renderHomeView(); }
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                const targetNode = sidebarNavElements[sidebarNavFocusedIndex];
+                if (targetNode.type === 'profile') {
+                    const targetId = targetNode.id;
+                    sidebarNavFocusedIndex = -1;
+                    applySidebarVimFocusStyles();
+                    selectProfile(targetId);
+                } else if (targetNode.type === 'folder') {
+                    toggleFolderCollapse(targetNode.id, null);
+                }
             }
             return;
         }
 
-        const cards = document.querySelectorAll('#home-task-container .task-card');
-        if (cards.length === 0) return;
+        // Router branch choice 2: Default Workspace Center Navigation Dashboard Hooks
+        if (activeMode === 'home' && vimFocusedIndex !== -1) {
+            const cards = document.querySelectorAll('#home-task-container .task-card');
+            if (cards.length === 0) return;
 
-        // Route: Vertical scrolling tracking modifiers "j" and "k"
-        if (e.key === 'j') {
-            e.preventDefault();
-            vimFocusedIndex = (vimFocusedIndex + 1) % cards.length;
-            renderHomeView();
-        } else if (e.key === 'k') {
-            e.preventDefault();
-            vimFocusedIndex = vimFocusedIndex <= 0 ? cards.length - 1 : vimFocusedIndex - 1;
-            renderHomeView();
-        } 
-        // Route: Selection execution modifiers "Space" or "Enter"
-        else if (e.key === ' ' || e.key === 'Enter') {
-            if (vimFocusedIndex !== -1 && cards[vimFocusedIndex]) {
+            if (e.key === 'j') {
                 e.preventDefault();
-                const tId = cards[vimFocusedIndex].getAttribute('data-task-id');
-                const pId = cards[vimFocusedIndex].getAttribute('data-profile-id');
-                toggleTask(tId, pId);
+                vimFocusedIndex = (vimFocusedIndex + 1) % cards.length;
+                renderHomeView();
+            } else if (e.key === 'k') {
+                e.preventDefault();
+                vimFocusedIndex = vimFocusedIndex <= 0 ? cards.length - 1 : vimFocusedIndex - 1;
+                renderHomeView();
+            } else if (e.key === ' ' || e.key === 'Enter') {
+                e.preventDefault();
+                if (cards[vimFocusedIndex]) {
+                    const tId = cards[vimFocusedIndex].getAttribute('data-task-id');
+                    const pId = cards[vimFocusedIndex].getAttribute('data-profile-id');
+                    toggleTask(tId, pId);
+                }
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                vimFocusedIndex = -1;
+                if (activeEl) activeEl.blur();
+                renderHomeView();
             }
         }
     });
@@ -1106,8 +1222,7 @@
     function exportDataBundle() {
         const confirmation = confirm(
             `⚠️ CONFIRM GENERATIONAL HARD RESET ⚠️\n\n` +
-            `This execution wipes ALL current directories, active folders, and user profiles back to complete ZERO.\n\n` +
-            `Wipe the interface state foundation clean?`
+            `This execution wipes ALL clean.\n\n`
         );
         
         if (!confirmation) return;
@@ -1166,7 +1281,6 @@
         document.getElementById('active-title').innerText = 'Awaiting Initialization';
         document.getElementById('active-meta').innerText = 'System Wiped Clean // Gen Initialized';
         
-        alert(`Unified cross-generational timeline compiled into clipboard memory!\n\nEngine state completely returned to absolute zero.`);
         setMode('home');
     }
 
@@ -1217,10 +1331,10 @@
                 renderSidebar();
                 updateGenerationLabel();
                 setMode('home');
-                alert("Master cross-generational system timeline and active layouts completely restored.");
+                alert("Master cross-generational system timeline restored.");
 
             } catch (err) {
-                alert("Import Exception: Failed to decode incoming backup asset format.");
+                alert("Import Exception.");
             }
             inputElement.value = ''; 
         };
