@@ -231,7 +231,7 @@
 
     <div id="home-section">
         <div style="background: rgba(0, 255, 136, 0.05); border: 1px solid var(--accent); padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; color: var(--accent);">
-            <strong>QUICK VIEW PANEL:</strong> Here are the tasks across all system layouts that require tracking parameter completion within the immediate operational horizon.
+            <strong>QUICK VIEW PANEL:</strong> High priority upcoming targets and daily tracking tasks sorted dynamically by immediate operational relevance.
         </div>
         <div id="home-task-container"></div>
     </div>
@@ -635,39 +635,64 @@
         container.innerHTML = '';
 
         const todayStr = getDateString();
-        let nearHorizonTasks = [];
+        let homeDisplayArray = [];
 
-        // Gather upcoming or uncompleted near horizon items across profiles
         Object.keys(state.profiles).forEach(pId => {
             const p = state.profiles[pId];
             p.tasks.forEach(t => {
                 let isCompletedToday = state.logs[todayStr]?.[pId]?.[t.id] === true;
-                
+                if (isCompletedToday) return; // Drop completed assets off dashboard view
+
+                let priorityWeight = 3; // Default baseline bucket assignment
+                let daysLeft = null;
+
                 if (t.date) {
                     const diffTime = new Date(t.date) - new Date(todayStr);
-                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                    // Horizon window setup: 3 days out or overdue
-                    if (diffDays <= 3 && !isCompletedToday) {
-                        nearHorizonTasks.push({ task: t, profile: p, daysLeft: diffDays });
+                    daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    
+                    // Rule: Tasks 1 day away, due today, or overdue warp instantly to position 1
+                    if (daysLeft <= 1) {
+                        priorityWeight = 1;
+                    } else if (daysLeft <= 3) {
+                        priorityWeight = 3; // Keep on dashboard but lower than active cyclicals
+                    } else {
+                        return; // Out of horizon limits completely
                     }
-                } else if (!isCompletedToday) {
-                    nearHorizonTasks.push({ task: t, profile: p, daysLeft: 0 });
+                } else if (p.type === 'cyclical') {
+                    priorityWeight = 2; // Resets every day
+                } else if (p.type === 'never') {
+                    priorityWeight = 4; // Permanent benchmarks go to the floor
                 }
+
+                homeDisplayArray.push({ task: t, profile: p, weight: priorityWeight, daysLeft: daysLeft });
             });
         });
 
-        if (nearHorizonTasks.length === 0) {
-            container.innerHTML = `<div style="color:var(--text-dim); font-size:14px; font-style:italic;">No structural target nodes demand focus within the 72-hour operating array. Good alignment.</div>`;
+        if (homeDisplayArray.length === 0) {
+            container.innerHTML = `<div style="color:var(--text-dim); font-size:14px; font-style:italic;">No active structural execution parameters found for sorting. System clear.</div>`;
             return;
         }
 
-        nearHorizonTasks.sort((a, b) => (a.task.date || '') > (b.task.date || '') ? 1 : -1);
+        // Sort execution logic: Smallest weight number takes primary real estate. Chronological sort for matching date tags.
+        homeDisplayArray.sort((a, b) => {
+            if (a.weight !== b.weight) return a.weight - b.weight;
+            if (a.task.date && b.task.date) return a.task.date > b.task.date ? 1 : -1;
+            return 0;
+        });
 
-        nearHorizonTasks.forEach(item => {
+        homeDisplayArray.forEach(item => {
             const t = item.task;
             const card = document.createElement('div');
             card.className = 'task-card';
-            card.style.borderLeftColor = item.daysLeft < 0 ? 'var(--danger)' : 'var(--warn)';
+
+            // Distinct visual warning flags for fast deadlines
+            if (item.weight === 1) {
+                card.style.borderLeftColor = 'var(--danger)';
+            } else if (item.weight === 2) {
+                card.style.borderLeftColor = 'var(--accent)';
+            } else {
+                card.style.borderLeftColor = 'var(--warn)';
+            }
 
             const badgeDateTime = formatBadgeDateTime(t.date, t.time);
             card.innerHTML = `
@@ -676,9 +701,12 @@
                     <div class="task-info">
                         <div>
                             <div class="task-name">${t.name}</div>
-                            <div style="font-size: 11px; color: var(--accent); margin-top:2px;">Target Context Map: [${item.profile.name}]</div>
+                            <div style="font-size: 11px; color: var(--text-dim); margin-top:2px;">
+                                Context Link: <span style="color: var(--accent); font-weight: bold;">[${item.profile.name}]</span>
+                                ${item.weight === 1 ? ' — <span style="color: var(--danger); font-weight: bold;">CRITICAL HORIZON</span>' : ''}
+                            </div>
                         </div>
-                        <div class="task-meta">${badgeDateTime ? `Target: ${badgeDateTime}` : 'Daily Routine Cycle'}</div>
+                        <div class="task-meta">${badgeDateTime ? `Target: ${badgeDateTime}` : 'Daily Cyclical Reset'}</div>
                     </div>
                 </div>
             `;
@@ -743,7 +771,6 @@
                 p.tasks.forEach(t => {
                     let clearedYesterdayOrPrior = false;
                     
-                    // Look through logs starting from yesterday back to determine if completed task deserves pruning
                     Object.keys(state.logs).forEach(dateKey => {
                         if (dateKey !== todayStr && state.logs[dateKey]?.[pId]?.[t.id] === true) {
                             clearedYesterdayOrPrior = true;
