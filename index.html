@@ -3,21 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Accountability Engine // Terminal</title>
+    <title>Daily Quest Log // Interrogation Terminal</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&family=Space+Grotesk:wght@400;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
-            --bg: #08080a;
-            --panel: #121217;
-            --border: rgba(255, 255, 255, 0.08);
+            --bg: #060608;
+            --panel: #0d0d12;
+            --border: rgba(255, 255, 255, 0.07);
             --accent: #00ff88;
-            --accent-dim: rgba(0, 255, 136, 0.1);
+            --accent-dim: rgba(0, 255, 136, 0.08);
             --danger: #ff4655;
+            --danger-dim: rgba(255, 70, 85, 0.1);
             --text: #e2e2e9;
-            --text-dim: #767685;
-            --warn: #f59e0b;
+            --text-dim: #6d6d7e;
+            --terminal-user: #3b82f6;
         }
 
         body {
@@ -31,13 +31,14 @@
         }
 
         .sidebar {
-            width: 340px;
-            background: #0c0c0f;
+            width: 320px;
+            background: #09090c;
             border-right: 1px solid var(--border);
             display: flex;
             flex-direction: column;
             padding: 24px;
             box-sizing: border-box;
+            justify-content: space-between;
         }
 
         h2 {
@@ -54,23 +55,27 @@
             border: 1px solid var(--border);
             padding: 14px;
             border-radius: 8px;
-            margin-bottom: 10px;
+            margin-bottom: 15px;
         }
 
         input, select, textarea {
             width: 100%;
-            background: #08080a;
+            background: #040405;
             border: 1px solid var(--border);
             color: white;
-            padding: 10px;
-            border-radius: 4px;
+            padding: 12px;
+            border-radius: 6px;
             margin-bottom: 10px;
             font-family: inherit;
             box-sizing: border-box;
             font-size: 13px;
         }
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
 
-        textarea { height: 100px; resize: none; color: var(--accent); font-family: monospace; }
+        textarea { height: 120px; resize: none; color: var(--accent); font-family: monospace; }
 
         .btn {
             width: 100%;
@@ -78,1272 +83,345 @@
             background: var(--accent);
             color: black;
             border: none;
-            border-radius: 4px;
+            border-radius: 6px;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 1px;
             cursor: pointer;
-            transition: 0.2s;
+            transition: 0.15s;
             font-size: 12px;
             text-align: center;
         }
-        .btn:hover { background: #00cc6d; transform: translateY(-1px); }
-        .btn-secondary { background: #1f1f26; color: white; border: 1px solid var(--border); }
-        .btn-secondary:hover { background: #2a2a35; }
+        .btn:hover { background: #00dd76; transform: translateY(-1px); }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-danger:hover { background: #e03b48; }
+        .btn-secondary { background: #1a1a24; color: white; border: 1px solid var(--border); }
+        .btn-secondary:hover { background: #252533; }
 
-        .hierarchy-wrapper {
+        .quest-list {
             flex: 1;
+            overflow-y: auto;
+            margin-bottom: 15px;
+        }
+
+        .quest-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            margin-bottom: 6px;
+            text-align: left;
+            width: 100%;
+            font-family: inherit;
+            color: inherit;
+            cursor: pointer;
+        }
+        .quest-item:hover, .quest-item.active {
+            border-color: var(--accent);
+            background: var(--accent-dim);
+        }
+
+        .scrub-action { background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 14px; font-weight: bold; }
+        .scrub-action:hover { color: var(--danger); }
+
+        .workspace {
+            flex: 1;
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+            background: radial-gradient(circle at 90% 10%, rgba(0, 255, 136, 0.02), transparent);
+        }
+
+        .view-header {
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 20px;
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .view-header h1 { font-family: 'Orbitron', sans-serif; font-size: 24px; margin: 0; letter-spacing: 1px; }
+
+        .terminal-container {
+            flex: 1;
+            background: #040406;
+            border: 1px solid var(--border);
+            border-radius: 12px;
             display: flex;
             flex-direction: column;
             overflow: hidden;
             position: relative;
         }
 
-        .scroll-nav-btn {
-            background: rgba(255, 255, 255, 0.02);
+        .terminal-feed {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            font-family: monospace;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .msg { display: flex; flex-direction: column; max-width: 85%; }
+        .msg.sys { align-self: flex-start; color: var(--accent); }
+        .msg.user { align-self: flex-end; color: #69a1ff; text-align: right; }
+        
+        .msg-sender { font-size: 10px; font-family: 'Orbitron', sans-serif; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; color: var(--text-dim); }
+        .msg.sys .msg-sender { color: var(--accent); }
+        .msg.user .msg-sender { color: var(--terminal-user); }
+
+        .msg-text { background: rgba(255, 255, 255, 0.02); padding: 12px 16px; border-radius: 8px; border: 1px solid var(--border); white-space: pre-wrap; }
+        .msg.sys .msg-text { background: var(--accent-dim); border-color: rgba(0, 255, 136, 0.15); }
+        .msg.user .msg-text { background: rgba(59, 130, 246, 0.08); border-color: rgba(59, 130, 246, 0.15); }
+
+        .terminal-input-bar {
+            display: flex;
+            border-top: 1px solid var(--border);
+            background: #09090c;
+            padding: 12px;
+            gap: 12px;
+            align-items: center;
+        }
+        .terminal-input-bar input { margin-bottom: 0; font-family: monospace; }
+        .terminal-input-bar ::placeholder { color: #4b4b5a; }
+
+        .export-drawer {
+            margin-top: 20px;
+            background: var(--panel);
             border: 1px solid var(--border);
-            color: var(--accent);
-            padding: 4px;
-            font-size: 10px;
-            cursor: pointer;
-            border-radius: 4px;
-            margin: 2px 0;
-            font-family: 'Orbitron', sans-serif;
-            font-weight: bold;
-            transition: background 0.2s;
+            border-radius: 8px;
+            padding: 16px;
         }
-        .scroll-nav-btn:hover { background: var(--accent-dim); }
-
-        .profile-list { 
-            flex: 1; 
-            overflow-y: auto; 
-            padding-right: 4px;
-            scroll-behavior: smooth;
-        }
-        .profile-list::-webkit-scrollbar { width: 0px; }
-
-        .folder-block { margin-bottom: 12px; border-left: 1px dashed rgba(255, 255, 255, 0.1); padding-left: 8px; }
-        .folder-header { display: flex; align-items: center; padding: 8px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border); border-radius: 4px; font-weight: 700; font-size: 13px; color: #f4b400; margin-bottom: 6px; gap: 6px; outline: none; }
-        .folder-header.sidebar-nav-focused { border-color: #f4b400; background: rgba(244, 180, 0, 0.1); }
-
-        .folder-toggle-btn { background: none; border: none; color: #f4b400; cursor: pointer; font-size: 11px; padding: 2px 6px; border-radius: 3px; }
-        .folder-toggle-btn:hover { background: rgba(244, 180, 0, 0.1); }
-        .folder-title-text { flex: 1; text-align: left; }
-
-        .profile-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; margin-bottom: 6px; cursor: pointer; transition: 0.15s; text-align: left; width: 100%; font-family: inherit; color: inherit; outline: none; }
-        .profile-item:hover, .profile-item.active { border-color: var(--accent); background: var(--accent-dim); }
-        .profile-item.sidebar-nav-focused { border-color: var(--accent); box-shadow: 0 0 8px var(--accent-dim); background: rgba(255,255,255,0.02); }
-        .item-text-group { display: flex; flex-direction: column; pointer-events: none; }
-        .item-label-meta { color: var(--text-dim); font-size: 9px; text-transform: uppercase; margin-top: 2px; }
-
-        .scrub-action { background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 14px; font-weight: bold; padding: 0 4px; transition: color 0.1s; }
-        .scrub-action:hover { color: var(--danger); }
-
-        .mode-container { display: flex; gap: 8px; background: #0c0c12; padding: 6px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 25px; }
-        .mode-btn { flex: 1; background: none; border: none; color: var(--text-dim); padding: 10px; font-family: 'Orbitron', sans-serif; font-size: 11px; font-weight: bold; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; border-radius: 4px; transition: all 0.2s; }
-        .mode-btn.active { background: var(--accent); color: black; }
-
-        .workspace { flex: 1; padding: 40px; overflow-y: auto; display: flex; flex-direction: column; }
-        .view-header { border-bottom: 1px solid var(--border); padding-bottom: 20px; margin-bottom: 30px; }
-        .view-header h1 { font-family: 'Orbitron', sans-serif; font-size: 28px; margin: 0; }
-        .status-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: bold; background: var(--accent-dim); color: var(--accent); margin-top: 10px; }
-
-        .task-card { background: var(--panel); border: 1px solid var(--border); padding: 20px; border-radius: 12px; margin-bottom: 16px; display: flex; flex-direction: column; gap: 12px; transition: 0.2s; user-select: none; border-left: 4px solid var(--danger); outline: none; }
-        .task-card.verified { border-left-color: var(--accent); }
-        .task-card.vim-focused { border-color: var(--accent); box-shadow: 0 0 10px rgba(0, 255, 136, 0.2); background: rgba(255, 255, 255, 0.02); }
-        
-        .task-header-row { display: flex; align-items: center; gap: 20px; width: 100%; }
-        .check-box { width: 28px; height: 28px; border: 2px solid var(--text-dim); border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; box-sizing: border-box; flex-shrink: 0; }
-        .task-card.verified .check-box { border-color: var(--accent); background: var(--accent); }
-        .task-card.verified .check-box::after { content: '✓'; color: black; font-weight: bold; }
-
-        .task-info { flex: 1; display: flex; justify-content: space-between; align-items: center; }
-        .task-name { font-size: 18px; font-weight: 600; }
-        .task-meta { font-size: 12px; color: var(--text-dim); }
-        .task-card.verified .task-meta { color: var(--accent); }
-
-        .node-details-drawer { display: flex; flex-direction: column; gap: 6px; background: rgba(0, 0, 0, 0.2); padding: 12px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.03); margin-left: 48px; }
-        .node-desc-text { font-size: 13px; color: #b2b2bd; line-height: 1.5; }
-        
-        .node-meta-link-row { display: flex; gap: 16px; align-items: center; font-size: 12px; margin-top: 4px; }
-        .node-hyperlink { color: var(--accent); font-weight: bold; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; background: none; border: none; padding: 0; font-family: inherit; font-size: 12px; cursor: pointer; transition: text-shadow 0.2s; }
-        .node-hyperlink:hover { text-shadow: 0 0 4px var(--accent); text-decoration: underline; }
-        
-        .node-date-tag { background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.2); color: var(--warn); padding: 2px 8px; border-radius: 4px; font-family: monospace; font-size: 11px; }
-
-        .creator-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
-
-        .analytics-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; margin-top: 20px; }
-        .analytics-box { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 24px; box-sizing: border-box; }
-        
-        .node-charts-matrix-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; margin-top: 20px; }
-        .node-chart-wrapper-card { background: var(--panel); border: 1px solid var(--border); padding: 16px; border-radius: 12px; height: 220px; display: flex; flex-direction: column; }
-
-        .stat-card { background: #0c0c10; border: 1px solid var(--border); padding: 20px; border-radius: 8px; text-align: center; margin-bottom: 15px; }
-        .stat-num { font-family: 'Orbitron', sans-serif; font-size: 36px; color: var(--accent); font-weight: bold; }
-        
-        .history-list { list-style: none; padding: 0; margin: 15px 0 0 0; max-height: 200px; overflow-y: auto; }
-        .history-item { padding: 10px; border-bottom: 1px solid var(--border); font-size: 13px; display: flex; justify-content: space-between; }
-        
-        .hidden { display: none !important; }
-
-        .search-container { margin-bottom: 20px; position: relative; }
-        .search-container input { padding-left: 36px; color: var(--accent); font-family: monospace; }
-        .search-container::before { content: '/'; position: absolute; left: 14px; top: 10px; color: var(--text-dim); font-family: monospace; font-size: 14px; font-weight: bold; }
-
-        .sidebar-search-container { position: relative; margin-top: 10px; margin-bottom: 10px; }
-        .sidebar-search-container input { padding-left: 32px; background: #121217; color: #f4b400; font-family: monospace; font-size: 12px; }
-        .sidebar-search-container::before { content: '🔍'; position: absolute; left: 10px; top: 9px; font-size: 12px; }
     </style>
 </head>
 <body>
 
 <div class="sidebar">
-    <h1 style="font-family:'Orbitron'; font-size: 18px; color: var(--accent); margin: 0;">ENGINE.EXE</h1>
-    
-    <h2>Mount Directory Folder</h2>
-    <div class="config-box">
-        <input type="text" id="folder-name" placeholder="Folder Name (e.g., Fighting Games)">
-        <button class="btn" onclick="addFolderNode()">Create Folder</button>
+    <div>
+        <h1 style="font-family:'Orbitron'; font-size: 20px; color: var(--accent); margin: 0; letter-spacing: 1px;">QUEST_LOG.EXE</h1>
+        
+        <h2>Append Action Targets</h2>
+        <div class="config-box">
+            <input type="text" id="quest-input" placeholder="Goal/Task Objective...">
+            <button class="btn" onclick="addQuestNode()">Register Objective</button>
+        </div>
+
+        <h2>Active Objectives Matrix</h2>
+        <div id="quest-list-container" class="quest-list"></div>
     </div>
 
-    <h2>Mount New Profile</h2>
-    <div class="config-box">
-        <input type="text" id="prof-name" placeholder="Profile Name (e.g. Grinding)">
-        <select id="prof-folder-select"><option value="unassigned">-- No Folder (Root) --</option></select>
-        <select id="prof-type" onchange="toggleInterval()">
-            <option value="cyclical">Daily/Cyclical Reset</option>
-            <option value="never">Permanent Goal (No Reset)</option>
-        </select>
-        <input type="number" id="prof-int" value="1" placeholder="Days per cycle">
-        <button class="btn" onclick="addProfile()">Initialize Profile</button>
-    </div>
-
-    <h2>Active Hierarchy Layout</h2>
-    <div class="sidebar-search-container">
-        <input type="text" id="hierarchy-search-bar" placeholder="Fuzzy finder... (Ctrl+P)" oninput="renderSidebar()">
-    </div>
-    
-    <div class="hierarchy-wrapper">
-        <button class="scroll-nav-btn" onclick="programmaticSidebarScroll(-1)">▲ Scroll Unit Up</button>
-        <div id="sidebar-list" class="profile-list"></div>
-        <button class="scroll-nav-btn" onclick="programmaticSidebarScroll(1)">▼ Scroll Unit Down</button>
+    <div>
+        <button class="btn btn-danger" onclick="triggerGlobalReset()">⚠️ Global Reset Epoch</button>
     </div>
 </div>
 
 <div class="workspace">
-    <div class="mode-container">
-        <button class="mode-btn active" id="mode-home" onclick="setMode('home')">0. Homepage</button>
-        <button class="mode-btn" id="mode-setup" onclick="setMode('setup')">1. Setup Engine</button>
-        <button class="mode-btn" id="mode-interrogate" onclick="setMode('interrogate')">2. Interrogation Check</button>
-        <button class="mode-btn" id="mode-results" onclick="setMode('results')">3. Metric Results</button>
-    </div>
-
     <div class="view-header">
-        <h1 id="active-title">Awaiting Initialization</h1>
-        <div id="active-meta" class="status-badge">System Offline</div>
-    </div>
-
-    <div id="home-section">
-        <div id="home-task-container"></div>
-    </div>
-
-    <div id="setup-section" class="hidden">
-        <div id="setup-task-container"></div>
-        <div id="creator-tool" style="display:none; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border);">
-            <div style="background: rgba(255,255,255,0.02); padding: 16px; border-radius: 8px; border: 1px solid var(--border);">
-                <div style="display:flex; gap: 10px;">
-                    <input type="text" id="new-task-name" placeholder="Task Node Label Title (e.g., Practice Anti-Airs)" style="flex:1; margin-bottom:0;">
-                    <button class="btn" style="width: auto; padding: 0 24px;" onclick="addTask()">+ Append Node</button>
-                </div>
-                <div class="creator-form-grid">
-                    <input type="text" id="new-task-link" placeholder="Optional: Resource Link Address (URL)">
-                    <div style="display: flex; gap: 10px;">
-                        <input type="date" id="new-task-date" style="flex: 2; margin-bottom: 0;">
-                        <input type="time" id="new-task-time" style="flex: 1; margin-bottom: 0;">
-                    </div>
-                </div>
-                <input type="text" id="new-task-desc" placeholder="Optional Strategy Description / Context Details..." style="margin-bottom:0; margin-top:10px;">
-            </div>
+        <div>
+            <h1 id="terminal-header">Socratic Disruptor Console</h1>
+            <div style="font-size: 11px; color: var(--text-dim); text-transform: uppercase; margin-top: 4px; letter-spacing: 1px;">Status: Operational // Interactive Bypass Loop</div>
         </div>
     </div>
 
-    <div id="interrogate-section" class="hidden">
-        <div style="background: rgba(0, 255, 136, 0.05); border: 1px solid var(--accent); padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; color: var(--accent); display: flex; justify-content: space-between; align-items: center;">
-            <div style="max-width: 70%;">
-                <strong>INTERROGATION PROTOCOL:</strong> Tasks initialize as Incomplete. Check a card box to log successful completion.
-            </div>
-            <button class="btn" style="width: auto; padding: 8px 16px; font-size: 11px;" onclick="checkAllActiveTasks()">✓ Check All Tasks</button>
+    <div class="terminal-container">
+        <div id="terminal-feed" class="terminal-feed"></div>
+        <div class="terminal-input-bar">
+            <span style="color: var(--accent); font-family: monospace; font-weight: bold; padding-left: 8px;">&gt;</span>
+            <input type="text" id="terminal-input" placeholder="Type here to respond to the system query..." autocomplete="off">
+            <button class="btn" style="width: auto; padding: 0 24px; height: 42px;" onclick="handleUserSubmit()">Send</button>
         </div>
-        <div id="interrogate-task-container"></div>
     </div>
 
-    <div id="results-section" class="hidden">
-        <div class="analytics-grid">
-            <div class="analytics-box">
-                <h2 style="margin-top:0;">consistency.log // Overall Completed Nodes Matrix</h2>
-                <div style="position: relative; height:280px; width:100%;">
-                    <canvas id="mainChart"></canvas>
-                </div>
-            </div>
-            <div class="analytics-box" style="display: flex; flex-direction: column; justify-content: space-between;">
-                <div>
-                    <div class="stat-card">
-                        <div id="generation-label" style="font-size:11px; text-transform:uppercase; color:var(--warn); letter-spacing:1px; font-weight: bold; margin-bottom:5px;">GEN ARCHIVE RUN V0</div>
-                        <div style="font-size:11px; text-transform:uppercase; color:var(--text-dim); letter-spacing:1px;">Active Alignment Streak</div>
-                        <div class="stat-num" id="streak-counter">0 Days</div>
-                    </div>
-                </div>
-                <div>
-                    <button class="btn" style="background: var(--danger); color: white;" onclick="exportDataBundle()">Assemble AI Analytics Payload</button>
-                    <button class="btn btn-secondary" style="margin-top:8px;" onclick="triggerNativeJsonDownload()">Export Data To JSON File</button>
-                    <input type="file" id="import-json-file" style="display:none;" onchange="triggerNativeJsonImport(this)">
-                    <button class="btn btn-secondary" style="margin-top:8px;" onclick="document.getElementById('import-json-file').click()">Import & Merge JSON File</button>
-                </div>
-            </div>
+    <div class="export-drawer">
+        <h2 style="margin-top: 0;">AI Payload Transmission Stream</h2>
+        <div style="display: flex; gap: 12px; margin-bottom: 10px;">
+            <button class="btn btn-secondary" style="padding: 8px 16px; font-size: 11px;" onclick="assembleAiPayload()">Generate Telemetry Package</button>
+            <button class="btn btn-secondary" style="padding: 8px 16px; font-size: 11px;" onclick="copyPayloadText()">Copy Stream</button>
         </div>
-
-        <h2 style="margin-top:30px;">query_history.db // Isolated Node Micro-Logs</h2>
-        <div id="node-charts-matrix" class="node-charts-matrix-grid"></div>
-
-        <div class="analytics-box" style="margin-top: 25px;">
-            <h2 style="margin-top:0;">query_history.db // Deep Context Behavioral Log Filter</h2>
-            <input type="text" id="search-input" placeholder="Search patterns across execution logs..." oninput="filterPatterns()">
-            <div class="history-list" id="search-results"></div>
-        </div>
-
-        <div class="analytics-box" style="margin-top:25px;">
-            <h2 style="margin-top:0;">Export Transmission Stream</h2>
-            <textarea id="export-box" readonly placeholder="Compiled AI analytical bundle parameters string array datasets will surface here..."></textarea>
-        </div>
+        <textarea id="export-box" readonly placeholder="Analytical JSON dialogue data logs will render here..."></textarea>
     </div>
 </div>
 
 <script>
-    let rawState = localStorage.getItem('acc_engine_state_v4');
+    // System Socratic Prompting Question Array
+    const socraticQuestions = [
+        "What precisely is the absolute worst consequence if you decide not to touch this assignment right now?",
+        "Are you waiting to achieve a feeling of 'readiness' before acting? Where does that specific sensation manifest?",
+        "If an automated script forced you to do exactly 120 seconds of this work right now, what would break?",
+        "Look at your target goal. Is your current hesitation rooted in an unrecognized fear of failure, or a hidden fear of scale?",
+        "Describe the friction point keeping you in place. Is it mechanical lack of data, or an emotional energy blockade?",
+        "What happens to your long-term consistency run if today's window closes completely flat?"
+    ];
+
     let state;
+    const STORAGE_KEY = 'daily_quest_log_state_v5';
 
-    try {
-        let parsed = JSON.parse(rawState);
-        if (parsed && parsed.profiles && parsed.logs && parsed.folders && parsed.interactions) {
-            state = parsed;
-            if (!state.collapsedFolders) state.collapsedFolders = {};
-            if (!state.archives) state.archives = [];
-            if (!state.permanentCompletedHistory) state.permanentCompletedHistory = [];
-            if (state.generationVersion === undefined) state.generationVersion = 1;
-        } else {
-            throw new Error();
-        }
-    } catch(e) {
-        state = { folders: {}, profiles: {}, logs: {}, interactions: {}, collapsedFolders: {}, archives: [], permanentCompletedHistory: [], generationVersion: 1 };
-        localStorage.setItem('acc_engine_state_v4', JSON.stringify(state));
-    }
-
-    let activeProfileId = null;
-    let chart = null;
-    let singleNodeChartInstances = {}; 
-    let activeMode = 'home';
-    
-    // Independent Keyboard Navigation Scopes
-    let vimFocusedIndex = -1; 
-    let sidebarNavFocusedIndex = -1;
-    let sidebarNavElements = [];
-
-    function save() {
-        localStorage.setItem('acc_engine_state_v4', JSON.stringify(state));
-    }
-
-    function toggleInterval() {
-        const type = document.getElementById('prof-type').value;
-        document.getElementById('prof-int').style.display = type === 'never' ? 'none' : 'block';
-    }
-
-    function updateGenerationLabel() {
-        const lbl = document.getElementById('generation-label');
-        if(lbl) lbl.innerText = `GEN ARCHIVE RUN V${state.generationVersion || 1}`;
-    }
-
-    function setMode(mode) {
-        activeMode = mode;
-        document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-        document.getElementById(`mode-${mode}`).classList.add('active');
-
-        document.getElementById('home-section').classList.add('hidden');
-        document.getElementById('setup-section').classList.add('hidden');
-        document.getElementById('interrogate-section').classList.add('hidden');
-        document.getElementById('results-section').classList.add('hidden');
-        document.getElementById(`${mode}-section`).classList.remove('hidden');
-
-        logInteraction();
-        updateGenerationLabel();
-        
-        if (mode === 'home') {
-            vimFocusedIndex = -1;
-            renderHomeView();
-        } else if (activeProfileId) {
-            renderSetupView();
-            renderInterrogateView();
-            updateChart();
-            calculateStreak();
-            filterPatterns();
-        }
-    }
-
-    function getDateString() {
-        const now = new Date();
-        const adjusted = new Date(now.getTime() - (3 * 60 * 60 * 1000));
-        return adjusted.toISOString().split('T')[0];
-    }
-
-    function getOffsetDateString(dayOffset) {
-        const now = new Date();
-        const adjusted = new Date(now.getTime() - (dayOffset * 24 * 60 * 60 * 1000) - (3 * 60 * 60 * 1000));
-        return adjusted.toISOString().split('T')[0];
-    }
-
-    function logInteraction() {
-        const dStr = getDateString();
-        if (!state.interactions[dStr]) {
-            state.interactions[dStr] = 'login';
+    function initSystemState() {
+        let raw = localStorage.getItem(STORAGE_KEY);
+        try {
+            state = JSON.parse(raw);
+            if (!state || !state.quests || !state.dialogHistory) throw new Error();
+        } catch (e) {
+            state = {
+                quests: [],
+                dialogHistory: [
+                    { sender: 'sys', text: "SYSTEM INITIALIZED. Hello. Type 'hi' or greet the platform to awaken the disruption loop sequence." }
+                ],
+                questionIndex: 0
+            };
             save();
         }
     }
 
-    function addFolderNode() {
-        const name = document.getElementById('folder-name').value.trim();
-        if (!name) return alert("Please enter a valid folder name.");
-        const id = 'f_' + Date.now();
-        state.folders[id] = { id, name };
-        state.collapsedFolders[id] = false; 
-        save();
-        renderSidebar();
-        document.getElementById('folder-name').value = '';
+    function save() {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     }
 
-    function deleteFolderNode(id, event) {
-        event.stopPropagation();
-        if (!confirm("Scrub folder? Subitems restore default path layout inside Root namespace wrapper.")) return;
-        Object.keys(state.profiles).forEach(pId => {
-            if (state.profiles[pId].folderId === id) state.profiles[pId].folderId = 'unassigned';
-        });
-        delete state.folders[id];
-        delete state.collapsedFolders[id];
-        save();
-        renderSidebar();
-    }
-
-    function toggleFolderCollapse(id, event) {
-        if(event) event.stopPropagation();
-        state.collapsedFolders[id] = !state.collapsedFolders[id];
-        save();
-        renderSidebar();
-    }
-
-    function programmaticSidebarScroll(direction) {
-        const container = document.getElementById('sidebar-list');
-        if (!container) return;
-        const items = Array.from(container.querySelectorAll('.profile-item, .folder-header'));
-        if (items.length === 0) return;
-
-        let targetIndex = direction > 0 ? 0 : items.length - 1;
-        for (let i = 0; i < items.length; i++) {
-            const rect = items[i].getBoundingClientRect();
-            const parentRect = container.getBoundingClientRect();
-            if (direction > 0 && rect.top > parentRect.top + 5) {
-                targetIndex = i;
-                break;
-            } else if (direction < 0 && rect.top >= parentRect.top - 5) {
-                targetIndex = Math.max(0, i - 1);
-                break;
-            }
-        }
-        if (items[targetIndex]) {
-            container.scrollTop = (items[targetIndex].offsetTop - container.offsetTop);
-        }
-    }
-
-    function addProfile() {
-        const name = document.getElementById('prof-name').value.trim();
-        if (!name) return alert("Please enter a valid profile name.");
-        const id = 'p_' + Date.now();
-        state.profiles[id] = {
-            id, name,
-            folderId: document.getElementById('prof-folder-select').value,
-            type: document.getElementById('prof-type').value,
-            interval: Math.max(1, parseInt(document.getElementById('prof-int').value) || 1),
-            tasks: []
-        };
-        save();
-        renderSidebar();
-        selectProfile(id);
-        document.getElementById('prof-name').value = '';
-    }
-
-    function deleteProfileNode(id, event) {
-        event.stopPropagation();
-        if (!confirm("Permanently scrub profile layout and index parameters?")) return;
-        delete state.profiles[id];
-        if (activeProfileId === id) {
-            activeProfileId = null;
-            document.getElementById('creator-tool').style.display = 'none';
-            document.getElementById('setup-task-container').innerHTML = '';
-            document.getElementById('interrogate-task-container').innerHTML = '';
-            document.getElementById('active-title').innerText = 'Awaiting Initialization';
-            document.getElementById('active-meta').innerText = 'System Offline';
-            if (chart) chart.destroy();
-            destroySingleNodeCharts();
-        }
-        save();
-        renderSidebar();
-    }
-
-    function safelyLaunchTargetUrl(rawUrl) {
-        if(!rawUrl) return;
-        const formatted = rawUrl.match(/^https?:\/\//) ? rawUrl : 'https://' + rawUrl;
-        window.open(formatted, '_blank');
-    }
-
-    function formatBadgeDateTime(dateVal, timeVal) {
-        if (!dateVal) return '';
+    function renderQuests() {
+        const container = document.getElementById('quest-list-container');
+        container.innerHTML = '';
         
-        let displayStr = '';
-        const parts = dateVal.split('-');
-        if(parts.length === 3) {
-            displayStr += `${parts[1]}/${parts[2]}/${parts[0]}`;
-        } else {
-            displayStr += dateVal;
+        if (state.quests.length === 0) {
+            container.innerHTML = `<div style="color:var(--text-dim); font-size:12px; font-style:italic; padding:10px;">Matrix Empty. Load objectives to track.</div>`;
+            return;
         }
 
-        if (timeVal) {
-            const timeParts = timeVal.split(':');
-            let hours = parseInt(timeParts[0]);
-            const minutes = timeParts[1];
-            const ampm = hours >= 12 ? 'PM' : 'AM';
-            hours = hours % 12;
-            hours = hours ? hours : 12; 
-            displayStr += ` @ ${hours}:${minutes} ${ampm}`;
-        }
-        return displayStr;
-    }
-
-    function addTask() {
-        const name = document.getElementById('new-task-name').value.trim();
-        const link = document.getElementById('new-task-link').value.trim();
-        const date = document.getElementById('new-task-date').value;
-        const time = document.getElementById('new-task-time').value;
-        const desc = document.getElementById('new-task-desc').value.trim();
-        
-        if (!name || !activeProfileId) return;
-        
-        state.profiles[activeProfileId].tasks.push({ 
-            id: 't_' + Date.now(), 
-            name, link, date, time, desc
-        });
-        
-        document.getElementById('new-task-name').value = '';
-        document.getElementById('new-task-link').value = '';
-        document.getElementById('new-task-date').value = '';
-        document.getElementById('new-task-time').value = '';
-        document.getElementById('new-task-desc').value = '';
-        save();
-        renderSetupView();
-    }
-
-    function deleteTask(taskId) {
-        if (!confirm("Permanently strip this specific node row component?")) return;
-        state.profiles[activeProfileId].tasks = state.profiles[activeProfileId].tasks.filter(t => t.id !== taskId);
-        save();
-        renderSetupView();
-    }
-
-    function toggleTask(taskId, profileId = activeProfileId) {
-        const targetDateKey = getDateString();
-        if (!state.logs[targetDateKey]) state.logs[targetDateKey] = {};
-        if (!state.logs[targetDateKey][profileId]) state.logs[targetDateKey][profileId] = {};
-        
-        const current = state.logs[targetDateKey][profileId][taskId] === true; 
-        state.logs[targetDateKey][profileId][taskId] = !current;
-        state.interactions[targetDateKey] = 'marked';
-        
-        save();
-        if (activeMode === 'home') renderHomeView();
-        else renderInterrogateView();
-    }
-
-    function checkAllActiveTasks() {
-        if (!activeProfileId || !state.profiles[activeProfileId]) return;
-        const p = state.profiles[activeProfileId];
-        const targetDateKey = getDateString();
-        if (!state.logs[targetDateKey]) state.logs[targetDateKey] = {};
-        if (!state.logs[targetDateKey][activeProfileId]) state.logs[targetDateKey][activeProfileId] = {};
-
-        p.tasks.forEach(t => {
-            state.logs[targetDateKey][activeProfileId][t.id] = true;
-        });
-        state.interactions[targetDateKey] = 'marked';
-        save();
-        renderInterrogateView();
-    }
-
-    function selectProfile(id) {
-        activeProfileId = id;
-        document.getElementById('creator-tool').style.display = 'block';
-        logInteraction();
-        renderSidebar();
-        setMode('setup');
-    }
-
-    function renderSidebar() {
-        const list = document.getElementById('sidebar-list');
-        const select = document.getElementById('prof-folder-select');
-        
-        const queryInput = document.getElementById('hierarchy-search-bar');
-        const queryText = queryInput ? queryInput.value.toLowerCase().trim() : '';
-
-        list.innerHTML = '';
-        select.innerHTML = '<option value="unassigned">-- No Folder (Root) --</option>';
-        
-        sidebarNavElements = []; // Clear current layout element map references
-
-        Object.keys(state.folders).forEach(fId => {
-            const f = state.folders[fId];
-            const opt = document.createElement('option');
-            opt.value = fId; opt.textContent = f.name;
-            select.appendChild(opt);
-
-            // Filter configuration logic
-            const matchFolder = f.name.toLowerCase().includes(queryText);
-            
-            // Collect child objects matching query parameter requirements
-            const matchedChildren = Object.keys(state.profiles).filter(pId => {
-                const p = state.profiles[pId];
-                return p.folderId === fId && p.name.toLowerCase().includes(queryText);
-            });
-
-            if (queryText && !matchFolder && matchedChildren.length === 0) return;
-
-            const isCollapsed = state.collapsedFolders[fId] === true;
-            const toggleIcon = isCollapsed ? '▶' : '▼';
-
-            const block = document.createElement('div');
-            block.className = 'folder-block';
-            block.innerHTML = `
-                <div class="folder-header" tabindex="0" data-nav-type="folder" data-folder-id="${fId}">
-                    <button class="folder-toggle-btn" onclick="toggleFolderCollapse('${fId}', event)">${toggleIcon}</button>
-                    <span class="folder-title-text">📁 ${f.name}</span>
-                    <button class="scrub-action" onclick="deleteFolderNode('${fId}', event)">✕</button>
-                </div>
-                <div id="container-${fId}" class="${isCollapsed && !queryText ? 'hidden' : ''}"></div>
+        state.quests.forEach((q, idx) => {
+            const el = document.createElement('div');
+            el.className = `quest-item`;
+            el.innerHTML = `
+                <span style="font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:80%;">🎯 ${q.name}</span>
+                <button class="scrub-action" onclick="deleteQuestNode(${idx}, event)">✕</button>
             `;
-            list.appendChild(block);
-
-            const headerEl = block.querySelector('.folder-header');
-            sidebarNavElements.push({ el: headerEl, type: 'folder', id: fId });
-
-            const targetChildContainer = block.querySelector(`#container-${fId}`);
-            
-            Object.keys(state.profiles).forEach(pId => {
-                const p = state.profiles[pId];
-                if (p.folderId !== fId) return;
-                if (queryText && !p.name.toLowerCase().includes(queryText)) return;
-
-                const btn = document.createElement('button');
-                btn.className = `profile-item ${pId === activeProfileId ? 'active' : ''}`;
-                btn.setAttribute('tabindex', '0');
-                btn.setAttribute('data-nav-type', 'profile');
-                btn.setAttribute('data-profile-id', pId);
-                btn.onclick = () => selectProfile(pId);
-                btn.innerHTML = `
-                    <div class="item-text-group">
-                        <span>📄 ${p.name}</span>
-                        <span class="item-label-meta">${p.type}</span>
-                    </div>
-                    <button class="scrub-action" onclick="deleteProfileNode('${pId}', event)">✕</button>
-                `;
-                targetChildContainer.appendChild(btn);
-                sidebarNavElements.push({ el: btn, type: 'profile', id: pId });
-            });
+            container.appendChild(el);
         });
-
-        // Handle Root Context elements layout processing map
-        const rootContainer = document.createElement('div');
-        rootContainer.id = 'container-unassigned';
-        list.appendChild(rootContainer);
-
-        Object.keys(state.profiles).forEach(id => {
-            const p = state.profiles[id];
-            if (p.folderId && state.folders[p.folderId]) return; // Handled
-            if (queryText && !p.name.toLowerCase().includes(queryText)) return;
-
-            const btn = document.createElement('button');
-            btn.className = `profile-item ${id === activeProfileId ? 'active' : ''}`;
-            btn.setAttribute('tabindex', '0');
-            btn.setAttribute('data-nav-type', 'profile');
-            btn.setAttribute('data-profile-id', id);
-            btn.onclick = () => selectProfile(id);
-            btn.innerHTML = `
-                <div class="item-text-group">
-                    <span>📄 ${p.name}</span>
-                    <span class="item-label-meta">${p.type}</span>
-                </div>
-                <button class="scrub-action" onclick="deleteProfileNode('${id}', event)">✕</button>
-            `;
-            rootContainer.appendChild(btn);
-            sidebarNavElements.push({ el: btn, type: 'profile', id: id });
-        });
-
-        // Ensure focused index safety bounds inside search constraints snapshots
-        if (sidebarNavFocusedIndex >= sidebarNavElements.length) {
-            sidebarNavFocusedIndex = sidebarNavElements.length - 1;
-        }
-        applySidebarVimFocusStyles();
     }
 
-    function applySidebarVimFocusStyles() {
-        sidebarNavElements.forEach((item, idx) => {
-            if (idx === sidebarNavFocusedIndex) {
-                item.el.classList.add('sidebar-nav-focused');
-                item.el.focus();
-                
-                // Programmatic viewport alignment adjustment core routine logic
-                const parentContainer = document.getElementById('sidebar-list');
-                const elementTop = item.el.offsetTop;
-                const containerScrollTop = parentContainer.scrollTop;
-                const containerHeight = parentContainer.clientHeight;
+    function addQuestNode() {
+        const input = document.getElementById('quest-input');
+        const name = input.value.trim();
+        if (!name) return;
 
-                if (elementTop < containerScrollTop) {
-                    parentContainer.scrollTop = elementTop - 10;
-                } else if (elementTop + item.el.clientHeight > containerScrollTop + containerHeight) {
-                    parentContainer.scrollTop = elementTop - containerHeight + item.el.clientHeight + 10;
+        state.quests.push({ name, timestamp: new Date().toISOString() });
+        input.value = '';
+        save();
+        renderQuests();
+    }
+
+    function deleteQuestNode(idx, e) {
+        e.stopPropagation();
+        state.quests.splice(idx, 1);
+        save();
+        renderQuests();
+    }
+
+    function renderTerminalFeed() {
+        const feed = document.getElementById('terminal-feed');
+        feed.innerHTML = '';
+
+        state.dialogHistory.forEach(msg => {
+            const card = document.createElement('div');
+            card.className = `msg ${msg.sender}`;
+            card.innerHTML = `
+                <span class="msg-sender">${msg.sender === 'sys' ? 'SYS_DISRUPTOR' : 'USER_TARGET'}</span>
+                <div class="msg-text">${msg.text}</div>
+            `;
+            feed.appendChild(card);
+        });
+
+        feed.scrollTop = feed.scrollHeight;
+    }
+
+    function appendDialog(sender, text) {
+        state.dialogHistory.push({ sender, text });
+        save();
+        renderTerminalFeed();
+    }
+
+    function handleUserSubmit() {
+        const input = document.getElementById('terminal-input');
+        const text = input.value.trim();
+        if (!text) return;
+
+        appendDialog('user', text);
+        input.value = '';
+
+        // Core Dialogue Logic Controller
+        setTimeout(() => {
+            const testClean = text.toLowerCase();
+            if (testClean === 'hi' || testClean === 'hello' || testClean === 'hey') {
+                if (state.quests.length === 0) {
+                    appendDialog('sys', "Greetings. The system registers no active objectives in your sidebar layout matrix. Mount a target goal so we can interrogate your strategy architecture.");
+                } else {
+                    state.questionIndex = 0;
+                    appendDialog('sys', `Acknowledged. Let's inspect your focus framework.\n\nTarget Metric: "${state.quests[0].name}"\n\nInterrogation Route Step 1:\n${socraticQuestions[0]}`);
                 }
             } else {
-                item.el.classList.remove('sidebar-nav-focused');
-            }
-        });
-    }
-
-    function renderHomeView() {
-        document.getElementById('active-title').innerText = `HQ // OPERATIONS OVERVIEW`;
-        document.getElementById('active-meta').innerText = `System Online // Aggregated Dash`;
-        const container = document.getElementById('home-task-container');
-        
-        const todayStr = getDateString();
-        container.innerHTML = '';
-        let homeDisplayArray = [];
-
-        Object.keys(state.profiles).forEach(pId => {
-            const p = state.profiles[pId];
-            p.tasks.forEach(t => {
-                let isCompletedToday = state.logs[todayStr]?.[pId]?.[t.id] === true;
-                if (isCompletedToday) return; 
-
-                let priorityWeight = 3; 
-                let daysLeft = null;
-
-                if (t.date) {
-                    const diffTime = new Date(t.date) - new Date(todayStr);
-                    daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                    
-                    if (daysLeft <= 1) {
-                        priorityWeight = 1;
-                    } else if (daysLeft <= 3) {
-                        priorityWeight = 3; 
-                    } else {
-                        return; 
-                    }
-                } else if (p.type === 'cyclical') {
-                    priorityWeight = 2; 
-                } else if (p.type === 'never') {
-                    priorityWeight = 4; 
-                }
-
-                homeDisplayArray.push({ task: t, profile: p, weight: priorityWeight, daysLeft: daysLeft });
-            });
-        });
-
-        if (homeDisplayArray.length === 0) {
-            container.innerHTML = `<div style="color:var(--text-dim); font-size:14px; font-style:italic;">No active structural execution parameters found. Workspace Clear.</div>`;
-            return;
-        }
-
-        homeDisplayArray.sort((a, b) => {
-            if (a.weight !== b.weight) return a.weight - b.weight;
-            if (a.task.date && b.task.date) return a.task.date > b.task.date ? 1 : -1;
-            return 0;
-        });
-
-        if (vimFocusedIndex >= homeDisplayArray.length) {
-            vimFocusedIndex = homeDisplayArray.length - 1;
-        }
-
-        homeDisplayArray.forEach((item, idx) => {
-            const t = item.task;
-            const card = document.createElement('div');
-            card.className = `task-card ${idx === vimFocusedIndex ? 'vim-focused' : ''}`;
-            card.setAttribute('tabindex', '0');
-            card.setAttribute('data-task-id', t.id);
-            card.setAttribute('data-profile-id', item.profile.id);
-
-            if (item.weight === 1) {
-                card.style.borderLeftColor = 'var(--danger)';
-            } else if (item.weight === 2) {
-                card.style.borderLeftColor = 'var(--accent)';
-            } else {
-                card.style.borderLeftColor = 'var(--warn)';
-            }
-
-            const badgeDateTime = formatBadgeDateTime(t.date, t.time);
-            card.innerHTML = `
-                <div class="task-header-row">
-                    <div class="check-box" onclick="toggleTask('${t.id}', '${item.profile.id}')"></div>
-                    <div class="task-info">
-                        <div>
-                            <div class="task-name">${t.name}</div>
-                            <div style="font-size: 11px; color: var(--text-dim); margin-top:2px;">
-                                Context Link: <span style="color: var(--accent); font-weight: bold;">[${item.profile.name}]</span>
-                                ${item.weight === 1 ? ' — <span style="color: var(--danger); font-weight: bold;">CRITICAL HORIZON</span>' : ''}
-                            </div>
-                        </div>
-                        <div class="task-meta">${badgeDateTime ? `Target: ${badgeDateTime}` : 'Daily Cyclical Reset'}</div>
-                    </div>
-                </div>
-            `;
-            
-            card.addEventListener('click', () => {
-                sidebarNavFocusedIndex = -1; // Unfocus sidebar layout parameters
-                applySidebarVimFocusStyles();
-                vimFocusedIndex = idx;
-                renderHomeView();
-            });
-
-            container.appendChild(card);
-        });
-
-        if (vimFocusedIndex !== -1 && sidebarNavFocusedIndex === -1) {
-            const cards = container.querySelectorAll('.task-card');
-            if (cards[vimFocusedIndex]) cards[vimFocusedIndex].focus();
-        }
-    }
-
-    // Main Keyboard Router Layout Logic Block
-    window.addEventListener('keydown', function(e) {
-        const activeEl = document.activeElement;
-        const hSearchBar = document.getElementById('hierarchy-search-bar');
-
-        // Global Shortcut: Isolate hierarchy search field instantly on Ctrl+P intercept
-        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
-            e.preventDefault();
-            if (hSearchBar) {
-                hSearchBar.focus();
-                hSearchBar.select();
-            }
-            return;
-        }
-
-        // Drop active context emphasis boundaries safely inside standard controls fields
-        if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT')) {
-            if (e.key === 'Escape' || (e.key === 'Enter' && activeEl === hSearchBar)) {
-                activeEl.blur();
-                e.preventDefault();
-                // Transfer navigational priority directly over to mapped hierarchy elements list snapshot layout
-                if (sidebarNavElements.length > 0) {
-                    sidebarNavFocusedIndex = 0;
-                    vimFocusedIndex = -1;
-                    applySidebarVimFocusStyles();
+                // Advance Socratic Interrogation Loop
+                if (state.quests.length === 0) {
+                    appendDialog('sys', "System requires a contextual tracking anchor. Please log an target objective inside the workspace matrix configuration sidebar.");
+                } else {
+                    state.questionIndex = (state.questionIndex + 1) % socraticQuestions.length;
+                    const nextQuestion = socraticQuestions[state.questionIndex];
+                    appendDialog('sys', `Data parsed. Redirecting mind focus vector logic patterns...\n\nNext Interrogation Directive:\n${nextQuestion}`);
                 }
             }
-            return;
-        }
-
-        // Router branch choice 1: Mapped Sidebar Active Navigation Engine Hooks Intercept
-        if (sidebarNavFocusedIndex !== -1 && sidebarNavElements.length > 0) {
-            if (e.key === 'j') {
-                e.preventDefault();
-                sidebarNavFocusedIndex = (sidebarNavFocusedIndex + 1) % sidebarNavElements.length;
-                applySidebarVimFocusStyles();
-            } else if (e.key === 'k') {
-                e.preventDefault();
-                sidebarNavFocusedIndex = sidebarNavFocusedIndex <= 0 ? sidebarNavElements.length - 1 : sidebarNavFocusedIndex - 1;
-                applySidebarVimFocusStyles();
-            } else if (e.key === 'Escape') {
-                e.preventDefault();
-                sidebarNavFocusedIndex = -1;
-                applySidebarVimFocusStyles();
-                if (activeMode === 'home') { vimFocusedIndex = 0; renderHomeView(); }
-            } else if (e.key === 'Enter') {
-                e.preventDefault();
-                const targetNode = sidebarNavElements[sidebarNavFocusedIndex];
-                if (targetNode.type === 'profile') {
-                    const targetId = targetNode.id;
-                    sidebarNavFocusedIndex = -1;
-                    applySidebarVimFocusStyles();
-                    selectProfile(targetId);
-                } else if (targetNode.type === 'folder') {
-                    toggleFolderCollapse(targetNode.id, null);
-                }
-            }
-            return;
-        }
-
-        // Router branch choice 2: Default Workspace Center Navigation Dashboard Hooks
-        if (activeMode === 'home' && vimFocusedIndex !== -1) {
-            const cards = document.querySelectorAll('#home-task-container .task-card');
-            if (cards.length === 0) return;
-
-            if (e.key === 'j') {
-                e.preventDefault();
-                vimFocusedIndex = (vimFocusedIndex + 1) % cards.length;
-                renderHomeView();
-            } else if (e.key === 'k') {
-                e.preventDefault();
-                vimFocusedIndex = vimFocusedIndex <= 0 ? cards.length - 1 : vimFocusedIndex - 1;
-                renderHomeView();
-            } else if (e.key === ' ' || e.key === 'Enter') {
-                e.preventDefault();
-                if (cards[vimFocusedIndex]) {
-                    const tId = cards[vimFocusedIndex].getAttribute('data-task-id');
-                    const pId = cards[vimFocusedIndex].getAttribute('data-profile-id');
-                    toggleTask(tId, pId);
-                }
-            } else if (e.key === 'Escape') {
-                e.preventDefault();
-                vimFocusedIndex = -1;
-                if (activeEl) activeEl.blur();
-                renderHomeView();
-            }
-        }
-    });
-
-    function renderSetupView() {
-        if (!activeProfileId || !state.profiles[activeProfileId]) {
-            document.getElementById('setup-task-container').innerHTML = '';
-            return;
-        }
-        const p = state.profiles[activeProfileId];
-        const container = document.getElementById('setup-task-container');
-        document.getElementById('active-title').innerText = `SETUP // ${p.name}`;
-        document.getElementById('active-meta').innerText = `Persistence Layer Settings: ${p.type.toUpperCase()}`;
-        
-        container.innerHTML = '';
-        if(p.tasks.length === 0) {
-            container.innerHTML = `<div style="color:var(--text-dim); font-size:14px; font-style:italic;">No tracking matrix parameters generated inside this profile. Create node tasks below.</div>`;
-            return;
-        }
-
-        p.tasks.forEach(t => {
-            const card = document.createElement('div');
-            card.className = 'task-card';
-            
-            let setupDetailsBlock = '';
-            if (t.desc || t.link || t.date) {
-                const badgeDateTime = formatBadgeDateTime(t.date, t.time);
-                setupDetailsBlock = `
-                    <div class="node-details-drawer">
-                        ${t.desc ? `<div class="node-desc-text">${t.desc}</div>` : ''}
-                        <div class="node-meta-link-row">
-                            ${t.link ? `<button class="node-hyperlink" onclick="safelyLaunchTargetUrl('${t.link}')">🔗 Link Loaded</button>` : ''}
-                            ${badgeDateTime ? `<span class="node-date-tag">📅 Target: ${badgeDateTime}</span>` : ''}
-                        </div>
-                    </div>
-                `;
-            }
-
-            card.innerHTML = `
-                <div class="task-header-row">
-                    <div class="task-info" style="padding-left:10px;">
-                        <div class="task-name">${t.name}</div>
-                        <button class="scrub-action" style="font-size:18px;" onclick="deleteTask('${t.id}')">✕</button>
-                    </div>
-                </div>
-                ${setupDetailsBlock}
-            `;
-            container.appendChild(card);
-        });
+        }, 400);
     }
 
-    function processPermanentTaskAutoCleanup() {
-        const todayStr = getDateString();
-        
-        Object.keys(state.profiles).forEach(pId => {
-            const p = state.profiles[pId];
-            if (p.type === 'never') {
-                let remainingTasks = [];
-                p.tasks.forEach(t => {
-                    let clearedYesterdayOrPrior = false;
-                    
-                    Object.keys(state.logs).forEach(dateKey => {
-                        if (dateKey !== todayStr && state.logs[dateKey]?.[pId]?.[t.id] === true) {
-                            clearedYesterdayOrPrior = true;
-                        }
-                    });
-
-                    if (clearedYesterdayOrPrior) {
-                        state.permanentCompletedHistory.push({
-                            task: t,
-                            archivedAt: new Date().toISOString(),
-                            profileId: pId
-                        });
-                    } else {
-                        remainingTasks.push(t);
-                    }
-                });
-                p.tasks = remainingTasks;
-            }
-        });
-        save();
-    }
-
-    function renderInterrogateView() {
-        if (!activeProfileId || !state.profiles[activeProfileId]) {
-            document.getElementById('interrogate-task-container').innerHTML = '';
-            return;
-        }
-        
-        processPermanentTaskAutoCleanup();
-        
-        const p = state.profiles[activeProfileId];
-        const container = document.getElementById('interrogate-task-container');
-        document.getElementById('active-title').innerText = `INTERROGATION // ${p.name}`;
-        
-        container.innerHTML = '';
-        const targetDateKey = getDateString();
-
-        p.tasks.forEach(t => {
-            const isCompleted = state.logs[targetDateKey]?.[activeProfileId]?.[t.id] === true;
-            const card = document.createElement('div');
-            card.className = `task-card ${isCompleted ? 'verified' : 'failed'}`;
-            
-            let interrogateDetailsBlock = '';
-            if (t.desc || t.link || t.date) {
-                const badgeDateTime = formatBadgeDateTime(t.date, t.time);
-                interrogateDetailsBlock = `
-                    <div class="node-details-drawer">
-                        ${t.desc ? `<div class="node-desc-text">${t.desc}</div>` : ''}
-                        <div class="node-meta-link-row">
-                            ${t.link ? `<a href="${t.link.match(/^https?:\/\//) ? t.link : 'https://' + t.link}" target="_blank" class="node-hyperlink">🔗 Launch Tech Reference</a>` : ''}
-                            ${badgeDateTime ? `<span class="node-date-tag">📅 ${badgeDateTime}</span>` : ''}
-                        </div>
-                    </div>
-                `;
-            }
-
-            card.innerHTML = `
-                <div class="task-header-row">
-                    <div class="check-box" onclick="toggleTask('${t.id}')"></div>
-                    <div class="task-info">
-                        <div class="task-name">${t.name}</div>
-                        <div class="task-meta">${isCompleted ? 'Goal Target: MAINTAINED' : 'Acknowledge State: INCOMPLETE / PENDING'}</div>
-                    </div>
-                </div>
-                ${interrogateDetailsBlock}
-            `;
-            container.appendChild(card);
-        });
-    }
-
-    function calculateStreak() {
-        if (!activeProfileId || !state.profiles[activeProfileId]) return;
-        const p = state.profiles[activeProfileId];
-        const counterEl = document.getElementById('streak-counter');
-        if (!p || p.tasks.length === 0) {
-            counterEl.innerText = "0 Days";
-            return;
-        }
-        
-        let streak = 0;
-        let dayOffset = 0;
-        let maxIterations = 100;
-        
-        while (dayOffset < maxIterations) {
-            const targetDateKey = getOffsetDateString(dayOffset);
-            
-            let datePassed = p.tasks.length > 0;
-            p.tasks.forEach(t => {
-                if (state.logs[targetDateKey]?.[activeProfileId]?.[t.id] !== true) datePassed = false;
-            });
-
-            if (datePassed) {
-                streak++;
-                if(p.type === 'never') break;
-                dayOffset += Math.max(1, p.interval);
-            } else {
-                break;
-            }
-        }
-        counterEl.innerText = `${streak} Days`;
-    }
-
-    function destroySingleNodeCharts() {
-        Object.keys(singleNodeChartInstances).forEach(id => {
-            if(singleNodeChartInstances[id]) singleNodeChartInstances[id].destroy();
-        });
-        singleNodeChartInstances = {};
-    }
-
-    function updateChart() {
-        const canvas = document.getElementById('mainChart');
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        if (chart) chart.destroy();
-        destroySingleNodeCharts();
-
-        if (!activeProfileId || !state.profiles[activeProfileId]) return;
-        const p = state.profiles[activeProfileId];
-        const nodeMatrixGrid = document.getElementById('node-charts-matrix');
-        nodeMatrixGrid.innerHTML = '';
-
-        if (!p || p.tasks.length === 0) return;
-
-        const labels = [];
-        const absoluteCompletedCounts = [];
-        
-        for (let i = 6; i >= 0; i--) {
-            const offset = i * (p.type === 'never' ? 0 : p.interval);
-            const targetDateKey = getOffsetDateString(offset);
-            
-            labels.push(p.type === 'never' ? 'Current Epoch' : targetDateKey);
-            
-            let passedCount = 0;
-            p.tasks.forEach(t => {
-                if (state.logs[targetDateKey]?.[activeProfileId]?.[t.id] === true) passedCount++;
-            });
-            absoluteCompletedCounts.push(passedCount);
-        }
-
-        chart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels,
-                datasets: [{
-                    label: 'Nodes Completed Count',
-                    data: absoluteCompletedCounts,
-                    borderColor: '#00ff88',
-                    backgroundColor: 'rgba(0, 255, 136, 0.05)',
-                    borderWidth: 3,
-                    fill: true,
-                    tension: 0.2,
-                    pointBackgroundColor: '#00ff88'
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: { 
-                        min: 0, 
-                        max: p.tasks.length, 
-                        grid: { color: 'rgba(255,255,255,0.04)' }, 
-                        ticks: { stepSize: 1, color: '#767685' } 
-                    },
-                    x: { grid: { display: false }, ticks: { color: '#767685', font: { size: 10 } } }
-                },
-                plugins: { legend: { display: false } }
-            }
-        });
-
-        p.tasks.forEach(t => {
-            const card = document.createElement('div');
-            card.className = 'node-chart-wrapper-card';
-            card.innerHTML = `
-                <div style="font-size:12px; font-weight:bold; color:var(--accent); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">NODE // ${t.name}</div>
-                <div style="flex:1; position:relative; min-height:0;">
-                    <canvas id="canvas-${t.id}"></canvas>
-                </div>
-            `;
-            nodeMatrixGrid.appendChild(card);
-
-            const nodeSpecificHistoryData = [];
-            for (let i = 6; i >= 0; i--) {
-                const offset = i * (p.type === 'never' ? 0 : p.interval);
-                const targetDateKey = getOffsetDateString(offset);
-                const isNodePassed = state.logs[targetDateKey]?.[activeProfileId]?.[t.id] === true;
-                nodeSpecificHistoryData.push(isNodePassed ? 1 : 0);
-            }
-
-            const subCanvas = document.getElementById(`canvas-${t.id}`);
-            if (subCanvas) {
-                const subCtx = subCanvas.getContext('2d');
-                singleNodeChartInstances[t.id] = new Chart(subCtx, {
-                    type: 'line',
-                    data: {
-                        labels, 
-                        datasets: [{
-                            data: nodeSpecificHistoryData,
-                            borderColor: '#3b82f6',
-                            backgroundColor: 'rgba(59, 130, 246, 0.05)',
-                            borderWidth: 2,
-                            fill: true,
-                            tension: 0.1,
-                            pointBackgroundColor: '#3b82f6'
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        scales: {
-                            y: {
-                                min: 0, max: 1,
-                                grid: { color: 'rgba(255,255,255,0.02)' },
-                                ticks: {
-                                    stepSize: 1,
-                                    callback: (v) => v === 1 ? 'PASS' : 'FAIL',
-                                    color: '#767685',
-                                    font: { size: 9 }
-                                }
-                            },
-                            x: { grid: { display: false }, ticks: { color: '#767685', font: { size: 8 } } }
-                        },
-                        plugins: { legend: { display: false } }
-                    }
-                });
-            }
-        });
-    }
-
-    function filterPatterns() {
-        const query = document.getElementById('search-input').value.toLowerCase().trim();
-        const container = document.getElementById('search-results');
-        container.innerHTML = '';
-
-        Object.keys(state.interactions).forEach(date => {
-            const status = state.interactions[date];
-            let labelText = status === 'marked' ? 'VERIFIED WORK ACTIVITY LOGGED' : 'WARNING: GHOST LOGIN DETECTED (access without complete mark-off checks)';
-            let textColor = status === 'marked' ? 'var(--accent)' : 'var(--danger)';
-
-            if (!query || date.includes(query) || labelText.toLowerCase().includes(query)) {
-                const item = document.createElement('div');
-                item.className = 'history-item';
-                item.innerHTML = `<strong>${date}</strong> <span style="color:${textColor};">${labelText}</span>`;
-                container.appendChild(item);
-            }
-        });
-    }
-
-    function exportDataBundle() {
-        const confirmation = confirm(
-            `⚠️ CONFIRM GENERATIONAL HARD RESET ⚠️\n\n` +
-            `This execution wipes ALL clean.\n\n`
-        );
-        
+    function triggerGlobalReset() {
+        const confirmation = confirm("⚠️ ERASE ACTIVE RUN TIMELINE EPOCH ⚠️\n\nThis permanently purges active profiles, tracking registries, and conversational histories. Your raw parameters will clear out fully.");
         if (!confirmation) return;
 
-        const structuralRunSnapshot = {
-            generationIndex: `V${state.generationVersion}`,
-            timestamp: new Date().toISOString(),
-            folders: JSON.parse(JSON.stringify(state.folders)),
-            profiles: JSON.parse(JSON.stringify(state.profiles)),
-            logs: JSON.parse(JSON.stringify(state.logs)),
-            interactions: JSON.parse(JSON.stringify(state.interactions)),
-            permanentCompletedHistory: JSON.parse(JSON.stringify(state.permanentCompletedHistory))
+        state = {
+            quests: [],
+            dialogHistory: [
+                { sender: 'sys', text: "SYSTEM REBOOT COMPLETE. Memory modules initialized to ground state. Welcome to your fresh timeline. Say 'hi' to prompt the disruptor engine." }
+            ],
+            questionIndex: 0
         };
+        save();
+        renderQuests();
+        renderTerminalFeed();
+        document.getElementById('export-box').value = '';
+    }
 
-        state.archives.push(structuralRunSnapshot);
-
+    function assembleAiPayload() {
         const payload = {
-            metadata: { 
-                compiledAt: new Date().toISOString(), 
-                latestRetiredVersion: `V${state.generationVersion}`,
-                totalGenerationsLogged: state.archives.length 
-            },
-            currentFreshEngineState: {
-                versionCounter: `V${state.generationVersion + 1}`,
-                status: "ZERO_POINT_INITIALIZATION"
-            },
-            historicalGenerationsDatabaseTimeline: state.archives
+            exportTimestamp: new Date().toISOString(),
+            registeredObjectives: state.quests,
+            socraticDialogueLog: state.dialogHistory
         };
-        
+        document.getElementById('export-box').value = JSON.stringify(payload, null, 2);
+    }
+
+    function copyPayloadText() {
         const box = document.getElementById('export-box');
-        box.value = JSON.stringify(payload, null, 2);
+        if (!box.value) return;
         box.select();
-        
         try {
             navigator.clipboard.writeText(box.value);
         } catch (err) {}
-
-        state.folders = {};
-        state.profiles = {};
-        state.logs = {};
-        state.interactions = {};
-        state.collapsedFolders = {};
-        state.permanentCompletedHistory = [];
-        
-        state.generationVersion += 1;
-        save();
-        
-        activeProfileId = null;
-        if (chart) chart.destroy();
-        destroySingleNodeCharts();
-        
-        renderSidebar();
-        updateGenerationLabel();
-        
-        document.getElementById('creator-tool').style.display = 'none';
-        document.getElementById('active-title').innerText = 'Awaiting Initialization';
-        document.getElementById('active-meta').innerText = 'System Wiped Clean // Gen Initialized';
-        
-        setMode('home');
     }
 
-    function triggerNativeJsonDownload() {
-        const dataOutputPayload = {
-            metadata: { engineTitle: "Accountability Matrix Framework Core", timestamp: new Date().toISOString() },
-            folders: state.folders,
-            profiles: state.profiles,
-            logs: state.logs,
-            interactions: state.interactions,
-            collapsedFolders: state.collapsedFolders,
-            archives: state.archives,
-            permanentCompletedHistory: state.permanentCompletedHistory,
-            generationVersion: state.generationVersion
-        };
-        
-        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(dataOutputPayload, null, 2));
-        const anchorElementElement = document.createElement('a');
-        anchorElementElement.setAttribute("href", dataStr);
-        anchorElementElement.setAttribute("download", "accountability_engine_backup.json");
-        document.body.appendChild(anchorElementElement);
-        anchorElementElement.click();
-        anchorElementElement.remove();
-    }
+    // Modern Terminal Command Shortcut Mapping Setup
+    window.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && document.activeElement === document.getElementById('terminal-input')) {
+            handleUserSubmit();
+        }
+    });
 
-    function triggerNativeJsonImport(inputElement) {
-        const file = inputElement.files[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = function(event) {
-            try {
-                const incomingData = JSON.parse(event.target.result);
-                if (!incomingData || typeof incomingData !== 'object') {
-                    throw new Error("Invalid payload structure.");
-                }
-
-                if (incomingData.folders) state.folders = incomingData.folders;
-                if (incomingData.profiles) state.profiles = incomingData.profiles;
-                if (incomingData.logs) state.logs = incomingData.logs;
-                if (incomingData.interactions) state.interactions = incomingData.interactions;
-                if (incomingData.collapsedFolders) state.collapsedFolders = incomingData.collapsedFolders;
-                if (incomingData.archives) state.archives = incomingData.archives;
-                if (incomingData.permanentCompletedHistory) state.permanentCompletedHistory = incomingData.permanentCompletedHistory;
-                if (incomingData.generationVersion !== undefined) state.generationVersion = incomingData.generationVersion;
-
-                save();
-                renderSidebar();
-                updateGenerationLabel();
-                setMode('home');
-                alert("Master cross-generational system timeline restored.");
-
-            } catch (err) {
-                alert("Import Exception.");
-            }
-            inputElement.value = ''; 
-        };
-        reader.readAsText(file);
-    }
-
-    renderSidebar();
-    updateGenerationLabel();
-    setMode('home');
+    // Boot Initialization Call Routine
+    initSystemState();
+    renderQuests();
+    renderTerminalFeed();
 </script>
 </body>
 </html>
