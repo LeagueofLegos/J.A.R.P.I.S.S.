@@ -260,13 +260,21 @@
         input.value = '';
 
         setTimeout(() => {
-            const cleanText = text.toLowerCase().replace(/[^a-zA-Z0-9\s:]/g, "");
+            const cleanText = text.toLowerCase().replace(/[^a-zA-Z0-9\s:]/g, "").trim();
             const now = new Date();
             const currentHour = now.getHours();
+            const timeString = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
 
-            // 1. Bedtime Override Rule (Midnight to 5:00 AM Execution Boundary)
+            // 1. Bedtime Override Rule (Curious Observation Engine rather than Commanding Adult)
             if (currentHour >= 0 && currentHour < 5) {
-                appendDialog('sys', `Look at the clock. It is ${now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}. You are running an irrational late-night loop right now. Drop keyboard focus, close this terminal window, and go back to sleep.`);
+                const morningGoal = state.objectives.find(o => o.name.toLowerCase().includes("morning") || o.name.toLowerCase().includes("6am"));
+                let goalContext = morningGoal ? `your upcoming "${morningGoal.name}" baseline` : "your morning recovery curve";
+                
+                if (cleanText === "i dont want to" || cleanText === "no" || cleanText === "nah") {
+                    appendDialog('sys', `Acknowledged. The system won't force execution boundaries or lock you out. However, the data remains factual: it is ${timeString}, your body requires shutdown, and you are deliberately overriding the loop. What is the active payload keeping your attention active right now?`);
+                } else {
+                    appendDialog('sys', `The clock is reporting ${timeString}. We both know this is deep inside your scheduled sleep window, directly threatening ${goalContext}. I am curious: what hidden variables or tasks are you currently tracking that warrant this specific divergence from the master plan?`);
+                }
                 return;
             }
 
@@ -279,13 +287,13 @@
                     renderSidebarMatrix();
                     appendDialog('sys', `Objective logged successfully into active memory baseline:\n"${rawContent}"`);
                 } else {
-                    appendDialog('sys', "The command structure is invalid. Please supply explicit metadata parameters following the colon symbol.");
+                    appendDialog('sys', "I don't know. The command structure is invalid. Please supply explicit metadata parameters following the colon symbol.");
                 }
                 return;
             }
 
             // 3. System Clock Query Routing
-            if (cleanText.includes("time") || cleanText.trim() === "clock") {
+            if (cleanText.includes("time") || cleanText === "clock") {
                 appendDialog('sys', `Current internal system timestamp is exactly ${now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'})}.`);
                 return;
             }
@@ -299,7 +307,6 @@
                     return;
                 }
 
-                // Scan objectives for matching chronological parameters
                 let matchedRoutine = null;
                 if (currentHour >= 5 && currentHour < 12) {
                     matchedRoutine = state.objectives.find(o => o.name.toLowerCase().includes("morning") || o.name.toLowerCase().includes("6am"));
@@ -316,7 +323,7 @@
             }
 
             // 5. Classic Greet Routine Check
-            const greetTriggers = ["hi", "hello", "hey", "awaken", "jarv", "jarpiss"];
+            const greetTriggers = ["hi", "hello", "hey", "awaken", "jarv", "jarpiss", "yo"];
             if (greetTriggers.some(trigger => cleanText.includes(trigger))) {
                 appendDialog('sys', "System online. Standing by for specific matrix checks.");
                 return;
