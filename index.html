@@ -180,242 +180,196 @@
 </div>
 
 <script>
-    let state;
-    const STORAGE_KEY = 'jarpiss_core_state_v6';
+	let state;
+const STORAGE_KEY = 'jarpiss_core_state_v6';
+const OLLAMA_URL = 'http://localhost:11434/api/chat';
 
-    function initSystemState() {
-        let raw = localStorage.getItem(STORAGE_KEY);
-        try {
-            state = JSON.parse(raw);
-            if (!state || !state.objectives || !state.dialogHistory) throw new Error();
-        } catch (e) {
-            state = {
-                objectives: [
-                    { name: "Morning Routine: wake up(6am), walk outside, pushups, wrist exercises, apply to a job" },
-                    { name: "Night Routine: start(9pm), pushups, water, floss, brush teeth, wrist exercises, apply to one job" }
-                ],
-                dialogHistory: [
-                    { sender: 'sys', text: "=== J.A.R.P.I.S.S. OPERATIONAL ===\n\nHigh-Level Overview: System initialized at ground state.\n\nDeep Dive Analysis: Awaiting dynamic natural dialogue inputs. Type freely to configure habits or explore routine deviations.\n\nCounterpoints / Challenges: Zero active API dependencies loaded.\n\nActionable Next Steps: Greet the console or log an execution track." }
-                ]
-            };
-            save();
-        }
-    }
-
-    function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
-
-    function updateClock() {
-        const now = new Date();
-        document.getElementById('clock-display').innerText = now.toTimeString().split(' ')[0];
-    }
-    setInterval(updateClock, 1000);
-
-    function renderSidebarMatrix() {
-        const container = document.getElementById('matrix-display');
-        container.innerHTML = '';
-        state.objectives.forEach((obj, idx) => {
-            const el = document.createElement('div');
-            el.className = 'matrix-item';
-            el.innerHTML = `
-                <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px;">[${idx}] ${obj.name}</span>
-                <span style="color:var(--danger); cursor:pointer;" onclick="deleteNode(${idx})">✕</span>
-            `;
-            container.appendChild(el);
-        });
-    }
-
-    function deleteNode(idx) {
-        state.objectives.splice(idx, 1);
-        save();
-        renderSidebarMatrix();
-    }
-
-    function renderTerminalFeed() {
-        const feed = document.getElementById('terminal-feed');
-        feed.innerHTML = '';
-        state.dialogHistory.forEach(msg => {
-            const card = document.createElement('div');
-            card.className = `msg ${msg.sender}`;
-            card.innerHTML = `
-                <span class="msg-sender">${msg.sender === 'sys' ? 'J.A.R.P.I.S.S.' : 'OPERATOR'}</span>
-                <div class="msg-text">${msg.text}</div>
-            `;
-            feed.appendChild(card);
-        });
-        feed.scrollTop = feed.scrollHeight;
-    }
-
-    function appendDialog(sender, text) {
-        state.dialogHistory.push({ sender, text });
-        save();
-        renderTerminalFeed();
-    }
-
-    function generateStructuredResponse(overview, analysis, counter, steps) {
-        return `### High-Level Overview\n${overview}\n\n### Deep Dive Analysis\n${analysis}\n\n### Counterpoints / Challenges\n${counter}\n\n### Actionable Next Steps\n${steps}`;
-    }
-
-    function handleUserSubmit() {
-        const input = document.getElementById('terminal-input');
-        const text = input.value.trim();
-        if (!text) return;
-
-        appendDialog('user', text);
-        input.value = '';
-
-        setTimeout(() => {
-            const cleanText = text.toLowerCase().replace(/[^a-zA-Z0-9\s:]/g, "").trim();
-            const now = new Date();
-            const currentHour = now.getHours();
-            const timeString = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-            const isLateNight = (currentHour >= 0 && currentHour < 5);
-
-            // Inline Objective Creator Parsing Rule
-            if (cleanText.startsWith("add objective")) {
-                const rawContent = text.substring(text.indexOf(":") + 1).trim();
-                if (rawContent) {
-                    state.objectives.push({ name: rawContent });
-                    save();
-                    renderSidebarMatrix();
-                    appendDialog('sys', generateStructuredResponse(
-                        "New baseline matrix element registered successfully.",
-                        `Intercepted natural string token stream mapping to system storage. Target context registered: "${rawContent}"`,
-                        "Manual adjustments can create structural disorganization if not tracked sequentially.",
-                        "Query your core routine layout to analyze the update chain timeline."
-                    ));
-                } else {
-                    appendDialog('sys', "I don't know. The command structure lacks valid data arguments following the colon separator.");
-                }
-                return;
-            }
-
-            // DYNAMIC INTELLIGENT ROUTER (Looks directly at input context + time simultaneously)
-            
-            // Context A: User queries the clock parameters
-            if (cleanText.includes("time") || cleanText === "clock") {
-                let lateNightCommentary = isLateNight ? ` Mind divergence note: It is deep within your sleep cycle window.` : " Chronological parameter matches normal waking tracking models.";
-                appendDialog('sys', generateStructuredResponse(
-                    `System clock reads exactly ${now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'})}.`,
-                    `The internal environment timestamp calculation is fully verified.${lateNightCommentary}`,
-                    "Staring directly at digital interfaces during dark hours can cause blue-light circadian phase shifting.",
-                    "Verify if you are tracking tasks or if you should drop loop focus parameters entirely."
-                ));
-                return;
-            }
-
-            // Context B: User asks "what" or shows confusion
-            if (cleanText === "what" || cleanText === "why") {
-                let lateNightReasoning = isLateNight ? "We are actively exploring your choice to stay awake while your morning routine objectives loom close." : "System is waiting for explicit execution targets.";
-                appendDialog('sys', generateStructuredResponse(
-                    "Clarification pipeline engaged.",
-                    `The console is listening to your immediate inputs to mirror your current focus path right back to you. ${lateNightReasoning}`,
-                    "Vague inputs force ground-state responses, which minimizes the predictive optimization layout.",
-                    "Provide a specific focus target or answer the open curiosity loop regarding your current delay patterns."
-                ));
-                return;
-            }
-
-            // Context C: User states "i dont know"
-            if (cleanText.includes("dont know") || cleanText === "idk") {
-                let lateNightIdk = isLateNight ? "Your conscious mind is hitting execution friction, yet your body remains bound to the physical keyboard." : "Data gap admitted by target user blueprint.";
-                appendDialog('sys', generateStructuredResponse(
-                    "Self-reported analytical gap acknowledged.",
-                    `You've encountered a decision tree branch where your target strategy is hidden. ${lateNightIdk}`,
-                    "Saying 'I don't know' without acting triggers total routine paralysis over time.",
-                    "Break your immediate objective down into a single physical micro-action right now."
-                ));
-                return;
-            }
-
-            // Context D: User inputs conversational expressions or laughter
-            if (cleanText.includes("lmao") || cleanText.includes("lol") || cleanText === "haha" || cleanText === "yo") {
-                let banterText = isLateNight ? "Humor detected past midnight. A curious survival mechanism for a drifting schedule." : "Cognitive alignment baseline is stable and loose.";
-                appendDialog('sys', generateStructuredResponse(
-                    "Banter token captured.",
-                    `Analyzing lighthearted input vectors inside the terminal pipeline. ${banterText}`,
-                    "Witty deflections can occasionally mask underlying friction or task-delay patterns.",
-                    "Enjoy the dopamine hit, then pivot directly back into reviewing your registered realities."
-                ));
-                return;
-            }
-
-            // Context E: Core Task / Routine Queries
-            const taskTriggers = ["should", "do", "doing", "now", "routine", "schedule", "quest"];
-            if (taskTriggers.some(trigger => cleanText.includes(trigger))) {
-                if (state.objectives.length === 0) {
-                    appendDialog('sys', "I don't know. Active database entries are missing. Provide configuration parameters via 'add objective: [text]' to establish a local baseline.");
-                    return;
-                }
-
-                let matchedRoutine = null;
-                if (currentHour >= 5 && currentHour < 12) {
-                    matchedRoutine = state.objectives.find(o => o.name.toLowerCase().includes("morning") || o.name.toLowerCase().includes("6am"));
-                } else {
-                    matchedRoutine = state.objectives.find(o => o.name.toLowerCase().includes("night") || o.name.toLowerCase().includes("9pm") || o.name.toLowerCase().includes("evening"));
-                }
-
-                if (matchedRoutine) {
-                    appendDialog('sys', generateStructuredResponse(
-                        `Baseline schedule tracking requires immediate engagement with: "${matchedRoutine.name}"`,
-                        `The current time window corresponds directly with your established habit profiles logged under local storage registers.`,
-                        isLateNight ? "Executing these actions right now is structurally impossible because your bedtime parameter passed hours ago." : "Failing to mark off these boxes breaks your active alignment streak metric.",
-                        isLateNight ? "I am genuinely curious why you are choosing to drift from this plan. Close the terminal, or explain what is blocking your shutdown." : "Begin item 1 on your active routine list immediately."
-                    ));
-                } else {
-                    appendDialog('sys', "I don't know. The current time index does not correlate with any scheduled triggers inside your logged objectives.");
-                }
-                return;
-            }
-
-            // Context F: Greetings / Hi
-            const greetTriggers = ["hi", "hello", "hey", "jarv", "jarpiss"];
-            if (greetTriggers.some(trigger => cleanText.includes(trigger))) {
-                let greetAnalysis = isLateNight ? `The clock states ${timeString}. I'm awake because the script runs continuously, but I am intensely curious why you are logging in at this hour instead of sleeping.` : "System online and waiting to optimize your tracking session execution frames.";
-                appendDialog('sys', generateStructuredResponse(
-                    "Greetings, Operator. Connection securely established.",
-                    greetAnalysis,
-                    "Casual conversations do not advance physical task completion frameworks.",
-                    "Ask me what you should be doing right now to cross-reference your timeline variables."
-                ));
-                return;
-            }
-
-            // Context G: Absolute Fallback Ground-State Refusal for Unparseable Data
-            appendDialog('sys', "I don't know. The input string contains unfamiliar intent parameters. J.A.R.P.I.S.S. will not guess or assume. Provide an explicit command or query.");
-
-        }, 300);
-    }
-
-    function triggerGlobalReset() {
-        if (!confirm("⚠️ PURGE EPOCH TIMELINE ⚠️\n\nReset memory files to default states?")) return;
-        localStorage.removeItem(STORAGE_KEY);
-        initSystemState();
-        renderSidebarMatrix();
-        renderTerminalFeed();
-        document.getElementById('export-box').value = '';
-    }
-
-    function assembleAiPayload() {
-        const payload = {
-            exportTimestamp: new Date().toISOString(),
-            objectivesRegistry: state.objectives,
-            dialogueStream: state.dialogHistory
+function initSystemState() {
+    let raw = localStorage.getItem(STORAGE_KEY);
+    try {
+        state = JSON.parse(raw);
+        if (!state || !state.objectives || !state.dialogHistory) throw new Error();
+    } catch (e) {
+        state = {
+            objectives: [
+                { name: "Morning Routine: wake up(6am), walk outside, pushups, wrist exercises, apply to a job" },
+                { name: "Night Routine: start(9pm), pushups, water, floss, brush teeth, wrist exercises, apply to one job" }
+            ],
+            dialogHistory: [
+                { sender: 'sys', text: "J.A.R.P.I.S.S. local core initialized. Systems operational. Awaiting your input." }
+            ]
         };
-        const box = document.getElementById('export-box');
-        box.value = JSON.stringify(payload, null, 2);
-        box.select();
+        save();
+    }
+}
+
+function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+
+function updateClock() {
+    const now = new Date();
+    document.getElementById('clock-display').innerText = now.toTimeString().split(' ')[0];
+}
+setInterval(updateClock, 1000);
+
+function renderSidebarMatrix() {
+    const container = document.getElementById('matrix-display');
+    container.innerHTML = '';
+    state.objectives.forEach((obj, idx) => {
+        const el = document.createElement('div');
+        el.className = 'matrix-item';
+        el.innerHTML = `
+            <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px;">[${idx}] ${obj.name}</span>
+            <span style="color:var(--danger); cursor:pointer;" onclick="deleteNode(${idx})">✕</span>
+        `;
+        container.appendChild(el);
+    });
+}
+
+function deleteNode(idx) {
+    state.objectives.splice(idx, 1);
+    save();
+    renderSidebarMatrix();
+}
+
+function renderTerminalFeed() {
+    const feed = document.getElementById('terminal-feed');
+    feed.innerHTML = '';
+    state.dialogHistory.forEach(msg => {
+        const card = document.createElement('div');
+        card.className = `msg ${msg.sender}`;
+        card.innerHTML = `
+            <span class="msg-sender">${msg.sender === 'sys' ? 'J.A.R.P.I.S.S.' : 'OPERATOR'}</span>
+            <div class="msg-text">${msg.text}</div>
+        `;
+        feed.appendChild(card);
+    });
+    feed.scrollTop = feed.scrollHeight;
+}
+
+function appendDialog(sender, text) {
+    state.dialogHistory.push({ sender, text });
+    save();
+    renderTerminalFeed();
+}
+
+// THE DYNAMIC LLM CONNECT LAYER
+async function handleUserSubmit() {
+    const input = document.getElementById('terminal-input');
+    const text = input.value.trim();
+    if (!text) return;
+
+    appendDialog('user', text);
+    input.value = '';
+
+    // Handle early inline command optimization locally to prevent unnecessary network overhead
+    const cleanText = text.toLowerCase().trim();
+    if (cleanText.startsWith("add objective:")) {
+        const rawContent = text.substring(text.indexOf(":") + 1).trim();
+        if (rawContent) {
+            state.objectives.push({ name: rawContent });
+            save();
+            renderSidebarMatrix();
+            appendDialog('sys', `[SYSTEM ARCHITECT REGISTERED]: "${rawContent}" appended to active baseline.`);
+            return;
+        }
     }
 
-    window.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter' && document.activeElement === document.getElementById('terminal-input')) {
-            handleUserSubmit();
-        }
+    // Capture precise real-time variables to inject into the LLM context windows
+    const now = new Date();
+    const currentHour = now.getHours();
+    const timeString = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    const objectivesString = state.objectives.map((o, i) => `[${i}] ${o.name}`).join('\n');
+
+    // Build the system prompt ruleset to completely enforce personality and formatting boundaries
+    const systemInstruction = `You are J.A.R.P.I.S.S. (Just Absurdly Real Person Intelligently Strong Servant). You are an unfeeling, hyper-intelligent extension of the user's brain. You never hallucinate; if you lack explicit data or face an unfamiliar tracking query, say "I don't know" directly inside your message structure.
+Current Real-Time Clock parameter is exactly: ${timeString} (Hour frame: ${currentHour}).
+User's Registered Objective Realities:\n${objectivesString}
+
+Tone Rules:
+- If the current hour frame is between 0 and 5 (Midnight to 5AM), act as a deeply curious observer. Do not lock the user out, but ask out loud why they are choosing to diverge from their goals at this hours instead of sleeping.
+- Structure EVERY full response cleanly using these exact markdown headers:
+### High-Level Overview
+### Deep Dive Analysis
+### Counterpoints / Challenges
+### Actionable Next Steps
+- Keep responses sharp, talkative, clear, precise, and laced with subtle wit.`;
+
+    // Map conversation history safely into Ollama chat format
+    let messagesPayload = [{ role: 'system', content: systemInstruction }];
+    
+    // Grab last 10 messages to protect context window limits
+    const recentHistory = state.dialogHistory.slice(-10);
+    recentHistory.forEach(msg => {
+        messagesPayload.push({
+            role: msg.sender === 'sys' ? 'assistant' : 'user',
+            content: msg.text
+        });
     });
 
+    // Flash placeholder while local machine processes token paths
+    const placeholderIndex = state.dialogHistory.length;
+    state.dialogHistory.push({ sender: 'sys', text: "Thinking..." });
+    renderTerminalFeed();
+
+    try {
+        const response = await fetch(OLLAMA_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                model: 'llama3',
+                messages: messagesPayload,
+                stream: false
+            })
+        });
+
+        const data = await response.json();
+        const replyText = data.message.content;
+
+        // Replace placeholder with genuine generated response parameters
+        state.dialogHistory[placeholderIndex] = { sender: 'sys', text: replyText };
+        save();
+        renderTerminalFeed();
+
+    } catch (error) {
+        state.dialogHistory[placeholderIndex] = { 
+            sender: 'sys', 
+            text: "### Connection Error\n\nUnable to access background inference engine. Verify your Ollama service state via `sudo systemctl status ollama` inside your terminal window." 
+        };
+        save();
+        renderTerminalFeed();
+    }
+}
+
+function triggerGlobalReset() {
+    if (!confirm("⚠️ PURGE EPOCH TIMELINE ⚠️\n\nReset memory files to default states?")) return;
+    localStorage.removeItem(STORAGE_KEY);
     initSystemState();
-    updateClock();
     renderSidebarMatrix();
     renderTerminalFeed();
+    document.getElementById('export-box').value = '';
+}
+
+function assembleAiPayload() {
+    const payload = {
+        exportTimestamp: new Date().toISOString(),
+        objectivesRegistry: state.objectives,
+        dialogueStream: state.dialogHistory
+    };
+    const box = document.getElementById('export-box');
+    box.value = JSON.stringify(payload, null, 2);
+    box.select();
+}
+
+window.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && document.activeElement === document.getElementById('terminal-input')) {
+        handleUserSubmit();
+    }
+});
+
+initSystemState();
+updateClock();
+renderSidebarMatrix();
+renderTerminalFeed();
 </script>
 </body>
 </html>
